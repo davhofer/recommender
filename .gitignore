@@ -1,2 +1,5 @@
 lightning_logs/
 lightning_logs/*
+data/
+.ipynb_checkpoints/
+

@@ -3,19 +3,19 @@ from torch import optim, nn
 import lightning.pytorch as pl
 
 class NCFNetwork(pl.LightningModule):
-    def __init__(self, num_students, num_topics, student_embedding_dim, topic_embedding_dim, loss=nn.BCELoss()):
+    def __init__(self, num_students, num_topics, student_embedding_dim, topic_embedding_dim, predictive_factors, loss=nn.BCELoss()):
         super().__init__()
         self.student_embedding_layer = nn.Embedding(num_students, student_embedding_dim)
         self.topic_embedding_layer = nn.Embedding(num_topics, topic_embedding_dim)
         
         self.network = nn.Sequential(
-            nn.Linear(student_embedding_dim+topic_embedding_dim, 32),
+            nn.Linear(student_embedding_dim+topic_embedding_dim, predictive_factors*4),
             nn.ReLU(),
-            nn.Linear(32, 16),
+            nn.Linear(predictive_factors*4, predictive_factors*2),
             nn.ReLU(),
-            nn.Linear(16, 8),
+            nn.Linear(predictive_factors*2, predictive_factors),
             nn.ReLU(),
-            nn.Linear(8, 1),
+            nn.Linear(predictive_factors, 1),
             nn.Sigmoid(),
         )
 

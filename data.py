@@ -7,7 +7,7 @@ import numpy as np
 def preprocess_transactions(df):
         
     df = df[~df['topic_id'].isna()]
-    df['topic_id'] = df['topic_id'].astype(int)
+    df['topic_id'] = pd.to_numeric(df['topic_id'])
 
     # only keep users with at least 10 interactions
     df = df.groupby('user_id').filter(lambda x: len(x) >= 10)
@@ -64,6 +64,6 @@ class TransactionsStudentsTopicsDS(Dataset):
         return user, topic, y
 
 
-def get_transactions_dataloader(dataframe, batch_size, negative_frac=1.0):
-    dataset = TransactionsStudentsTopicsDS(dataframe, negative_frac=negative_frac)
+def get_transactions_dataloader(dataframe, user_ids, topic_ids, batch_size, negative_frac=1.0):
+    dataset = TransactionsStudentsTopicsDS(dataframe, user_ids, topic_ids, negative_frac=negative_frac)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)

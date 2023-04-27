@@ -1,9 +1,8 @@
 import csv
 
 
-def get_predictions(data, probas, threshold=0.5):
-    y_pred = (probas > threshold).float()
-    return [(item[0], item[1], item[2], pred.item()) for item, pred in zip(data, y_pred)]
+def get_predictions(data, probas):
+    return [(item[0], item[1], item[2], proba.item()) for item, proba in zip(data, probas)]
 
 
 def write_outputs(data, model_description, output_dir):
@@ -11,7 +10,7 @@ def write_outputs(data, model_description, output_dir):
 
     with open(outputs_path, 'w') as f:
         csv_out = csv.writer(f)
-        csv_out.writerow(['user_id', 'topic_id', 'was_interaction', 'interaction_prediction'])
+        csv_out.writerow(['user_id', 'topic_id', 'was_interaction', 'predict_proba'])
 
         for row in data:
             csv_out.writerow(row)

@@ -125,7 +125,7 @@ class LeaveOneOutSplitter:
         for user_id, topic_id in test_samples:
             for t in self.topic_ids:
                 label = 1.0 if topic_id == t else 0.0
-                self.test_data.append((user_id, topic_id, label))
+                self.test_data.append((user_id, t, label))
 
 
         for s in test_samples:

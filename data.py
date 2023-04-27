@@ -59,7 +59,15 @@ that was removed from the training set.
 """
 
 class LeaveOneOutDS(Dataset):
-    def __init__(self, df, test_user_frac=0.5, train_negative_frac=1.0, test_sample_strat="newest"):
+    def __init__(self,
+                 df,
+                 test_user_frac=0.5,
+                 train_negative_frac=1.0,
+                 test_sample_strat="newest",
+                 sampling_seed=131,
+                 ):
+        random.seed(sampling_seed)
+
         if test_sample_strat not in ['newest', 'random']:
             print("'test_sample_strat' should either be 'newest' or 'random'!")
             return

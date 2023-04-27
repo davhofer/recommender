@@ -114,10 +114,8 @@ class LeaveOneOutDS(Dataset):
     def __getitem__(self, index):
         user, topic, y = self.data[index]
 
-        user = self.user_ids.index(user)
         user = torch.tensor(user)
 
-        topic = self.topic_ids.index(topic)
         topic = torch.tensor(topic)
 
         y = torch.tensor([y])

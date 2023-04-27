@@ -33,6 +33,7 @@ class NCFNetwork(pl.LightningModule):
         self.loss = loss
 
         self.predict_proba = torch.Tensor()
+        self.loss_logs = []
 
         self.save_hyperparameters()
 
@@ -53,6 +54,8 @@ class NCFNetwork(pl.LightningModule):
 
         loss = self.loss(y_proba, y)
         self.log("train_loss", loss)
+
+        self.loss_logs.append(loss.item())
 
         return loss
 

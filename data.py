@@ -120,7 +120,12 @@ class LeaveOneOutSplitter:
             test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
         
         test_samples = random.sample(test_samples, test_size)
-        self.test_data = [(s[0], s[1], 1.0) for s in test_samples]
+
+        self.test_data = []
+        for user_id, topic_id in test_samples:
+            for t in self.topic_ids:
+                label = 1.0 if topic_id == t else 0.0
+                self.test_data.append((user_id, topic_id, label))
 
 
         for s in test_samples:

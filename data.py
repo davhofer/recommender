@@ -58,7 +58,8 @@ test set consists of a single interaction for each user (or a subset of users)
 that was removed from the training set.
 """
 
-class LeaveOneOutDS(Dataset):
+
+class LeaveOneOutSplitter:
     def __init__(self,
                  df,
                  test_user_frac=0.5,
@@ -110,7 +111,23 @@ class LeaveOneOutDS(Dataset):
         negatives = random.sample(list(no_interaction), int(train_negative_frac*len(positives)))
 
         self.data = [(x[0], x[1], 1.0) for x in positives] + [(x[0], x[1], 0.0) for x in negatives]
- 
+
+    def get_data(self):
+        return self.data
+
+    def get_test_data(self):
+        return self.test_data
+
+    def get_num_students(self):
+        return self.num_students
+
+    def get_num_topics(self):
+        return self.num_topics
+
+
+class LeaveOneOutDS(Dataset):
+    def __init__(self, data):
+        self.data = data
 
     def __len__(self):
         return len(self.data)
@@ -124,42 +141,3 @@ class LeaveOneOutDS(Dataset):
 
         y = torch.tensor([y])
         return user, topic, y
-
-
-
-class TransactionsStudentsTopicsDS(Dataset):
-    def __init__(self, df, user_ids, topic_ids, negative_frac=1.0):
-
-        self.user_ids = user_ids
-        self.topic_ids = topic_ids
-
-     
-        interactions = list(df.groupby(['user_id', 'topic_id']).count().index)
-
-        all_pairings = {(user, topic) for user in user_ids for topic in topic_ids}
-        positives = set(interactions)
-        no_interaction = all_pairings - positives
-        negatives = random.sample(list(no_interaction), int(negative_frac*len(positives)))
-
-        self.data = [(x[0], x[1], 1.0) for x in positives] + [(x[0], x[1], 0.0) for x in negatives]
-        
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        user, topic, y = self.data[index]
-
-        user = self.user_ids.index(user)
-        user = torch.tensor(user)
-
-        topic = self.topic_ids.index(topic)
-        topic = torch.tensor(topic)
-
-        y = torch.tensor([y])
-        return user, topic, y
-
-
-def get_transactions_dataloader(dataframe, user_ids, topic_ids, batch_size, negative_frac=1.0):
-    dataset = TransactionsStudentsTopicsDS(dataframe, user_ids, topic_ids, negative_frac=negative_frac)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)

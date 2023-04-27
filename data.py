@@ -90,25 +90,24 @@ class LeaveOneOutDS(Dataset):
 
         test_size = int(test_user_frac * len(self.user_ids))
 
-        self.test_samples = []
+        test_samples = []
         if self.test_sample_strat == 'random':
-            
             for id in self.user_ids:
                 user_interactions = list(filter(lambda x: x[0] == id, interactions))
                 s = random.choice(user_interactions)
-                self.test_samples.append(s)
-                
+                test_samples.append(s)
         else:
             user_last_event = df[['user_id', 'event_date']].groupby('user_id').max()
             df['test_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
-            self.test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
+            test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
         
-        self.test_samples = random.sample(self.test_samples, test_size)
+        test_samples = random.sample(test_samples, test_size)
+        self.test_data = [(s[0], s[1], 1.0) for s in test_samples]
 
-        for s in self.test_samples:
+
+        for s in test_samples:
             interactions.remove(s)
 
-            
 
         positives = set(interactions)
         negatives = random.sample(list(no_interaction), int(train_negative_frac*len(positives)))

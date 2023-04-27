@@ -52,12 +52,32 @@ def preprocess_events(df):
 
     return df
 
+class LeaveOneOutDS(Dataset):
+    def __init__(self, data, user_ids, topic_ids):
+        self.data = data
+        self.user_ids = user_ids
+        self.topic_ids = topic_ids
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        user, topic, y = self.data[index]
+
+        user = self.user_ids.index(user)
+        user = torch.tensor(user)
+
+        topic = self.topic_ids.index(topic)
+        topic = torch.tensor(topic)
+        y = torch.tensor([y])
+        return user, topic, y
+
+
 """
 Testing Procedure:
 test set consists of a single interaction for each user (or a subset of users)
 that was removed from the training set.
 """
-
 
 class LeaveOneOutSplitter:
     def __init__(self,
@@ -124,20 +144,14 @@ class LeaveOneOutSplitter:
     def get_num_topics(self):
         return self.num_topics
 
+    def get_user_ids(self):
+        return self.user_ids
 
-class LeaveOneOutDS(Dataset):
-    def __init__(self, data):
-        self.data = data
+    def get_topic_ids(self):
+        return self.topic_ids
 
-    def __len__(self):
-        return len(self.data)
+    def get_train_dataset(self):
+        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
 
-    def __getitem__(self, index):
-        user, topic, y = self.data[index]
-
-        user = torch.tensor(user)
-
-        topic = torch.tensor(topic)
-
-        y = torch.tensor([y])
-        return user, topic, y
+    def get_test_dataset(self):
+        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())

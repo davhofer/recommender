@@ -1,21 +1,32 @@
 import torch
 from torch import optim, nn
-import lightning.pytorch as pl
+import pytorch_lightning as pl
+
 
 class NCFNetwork(pl.LightningModule):
-    def __init__(self, num_students, num_topics, student_embedding_dim, topic_embedding_dim, loss=nn.BCELoss()):
+    def __init__(self,
+                 num_students,
+                 num_topics,
+                 predictive_factors=64,
+                 loss=nn.BCELoss(),
+                 ):
         super().__init__()
+
+        # Parameters are set up to match 3 linear layers configuration
+        student_embedding_dim = 2 * predictive_factors
+        topic_embedding_dim = 2 * predictive_factors
+
         self.student_embedding_layer = nn.Embedding(num_students, student_embedding_dim)
         self.topic_embedding_layer = nn.Embedding(num_topics, topic_embedding_dim)
-        
+
         self.network = nn.Sequential(
-            nn.Linear(student_embedding_dim+topic_embedding_dim, 32),
+            nn.Linear(student_embedding_dim + topic_embedding_dim, 4 * predictive_factors),
             nn.ReLU(),
-            nn.Linear(32, 16),
+            nn.Linear(4 * predictive_factors, 2 * predictive_factors),
             nn.ReLU(),
-            nn.Linear(16, 8),
+            nn.Linear(2 * predictive_factors, predictive_factors),
             nn.ReLU(),
-            nn.Linear(8, 1),
+            nn.Linear(predictive_factors, 1),
             nn.Sigmoid(),
         )
 
@@ -35,7 +46,6 @@ class NCFNetwork(pl.LightningModule):
 
         return proba
 
-
     def training_step(self, batch, batch_idx):
         student_x, topic_x, y = batch
 
@@ -53,9 +63,6 @@ class NCFNetwork(pl.LightningModule):
 
         self.predict_proba = torch.cat((self.predict_proba, y_proba.detach().cpu()))
 
-
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
-
-

@@ -396,7 +396,7 @@ class ItemKNNSplitter:
         interactions = interactions.rename(columns={'event_id': 'count'})
 
         self.matrix = interactions.pivot_table(index='topic_id', columns='user_id', values='count')
-        self.matrix = self.matrix.subtract(self.matrix.mean(axis=1), axis=0)
+        # self.matrix = self.matrix.subtract(self.matrix.mean(axis=1), axis=0)
 
         user_ids = list(set(map(lambda x: x[0], list(interactions_index))))
 

@@ -67,12 +67,22 @@ class NCFNetwork(pl.LightningModule):
         y_proba = self(*batch[:-1])
 
         loss = self.loss(y_proba, y)
-        self.log("train_loss", loss)
+
+        self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
 
         self.loss_logs.append(loss.item())
 
         return loss
 
+#    def validation_step(self, batch, batch_idx):
+#        y = batch[-1]
+#
+#        y_proba = self(*batch[:-1])
+#
+#        loss = self.loss(y_proba, y)
+#
+#        self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+#
     def test_step(self, batch, batch_idx):
         
 

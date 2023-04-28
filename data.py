@@ -4,7 +4,8 @@ import random
 import pandas as pd
 import numpy as np
 
-def preprocess_events(df):
+
+def preprocess_events(df, topics):
     df = df[~df['topic_id'].isna()]
     df = df[~df['session_id'].isna()]
 
@@ -54,6 +55,9 @@ def preprocess_events(df):
     df = df[df['user_id'].isin(filter_users)]
 
     df = df[interesting_cols]
+
+    topics = topics[['id', 'math']].rename(columns={'id': 'topic_id', 'math': 'is_math'})
+    df = pd.merge(left=df, right=topics, on='topic_id')
 
     return df
 

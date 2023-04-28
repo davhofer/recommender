@@ -2,7 +2,7 @@ import csv
 
 
 def get_predictions(data, probas):
-    return [(item[0], item[1], item[2], proba.item()) for item, proba in zip(data, probas)]
+    return [(item[0], item[1], item[3], proba.item()) for item, proba in zip(data, probas)]
 
 
 def write_outputs(data, loss_logs, model_description, output_dir):

@@ -53,7 +53,7 @@ class NCFNetwork(pl.LightningModule):
         student_emb = self.student_embedding_layer(student_x)
         topic_emb = self.topic_embedding_layer(topic_x)
 
-        x = torch.cat((student_emb, topic_emb, features_x), 1)
+        x = torch.cat((student_emb, topic_emb, *features_x), 1)
 
         proba = self.network(x)
 

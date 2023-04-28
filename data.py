@@ -224,6 +224,7 @@ class LeaveOneOutSplitter:
                  user_features=None,
                  topic_features=None,
                  test_user_frac=0.5,
+                 val_user_frac=0.5,
                  train_negative_frac=1.0,
                  test_sample_strat="newest",
                  ):
@@ -265,21 +266,32 @@ class LeaveOneOutSplitter:
         no_interaction = all_pairings - positives
 
         test_size = int(test_user_frac * len(self.user_ids))
+        val_size = int(val_user_frac * len(self.user_ids))
 
-        test_samples = []
+        val_test_samples = []
         if self.test_sample_strat == 'random':
             for id in self.user_ids:
                 user_interactions = list(filter(lambda x: x[0] == id, interactions))
                 s = random.choice(user_interactions)
-                test_samples.append(s)
+                val_test_samples.append(s)
         else:
             user_last_event = df[['user_id', 'event_date']].groupby('user_id').max()
             df['test_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
-            test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
-        
-        test_samples = random.sample(test_samples, test_size)
+            val_test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
 
+        val_samples = random.sample(val_test_samples, val_size)
+        for s in val_samples:
+            val_test_samples.remove(s)
 
+        test_samples = random.sample(val_test_samples, test_size)
+
+        self.val_data = []
+        for user_id, topic_id in val_samples:
+            features = []
+            if self.use_features:
+                features.append(self._get_user_feature(user_id))
+                features.append(self._get_topic_feature(topic_id))
+            self.val_data.append((user_id, topic_id, *features, 1.0))
 
         self.test_data = []
         for user_id, topic_id in test_samples:
@@ -291,8 +303,10 @@ class LeaveOneOutSplitter:
                 label = 1.0 if topic_id == t else 0.0
                 self.test_data.append((user_id, t, *features, label))
 
-
         for s in test_samples:
+            interactions.remove(s)
+
+        for s in val_samples:
             interactions.remove(s)
 
 
@@ -318,6 +332,9 @@ class LeaveOneOutSplitter:
             
     def get_data(self):
         return self.data
+
+    def get_val_data(self):
+        return self.val_data
 
     def get_test_data(self):
         return self.test_data
@@ -355,6 +372,9 @@ class LeaveOneOutSplitter:
 
     def get_train_dataset(self):
         return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
+
+    def get_val_dataset(self):
+        return LeaveOneOutDS(self.get_val_data(), self.get_user_ids(), self.get_topic_ids())
 
     def get_test_dataset(self):
         return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())

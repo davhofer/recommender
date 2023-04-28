@@ -57,14 +57,40 @@ def preprocess_events(df):
 
     return df
 
+class LeaveOneOutDS(Dataset):
+    def __init__(self, data, user_ids, topic_ids):
+        self.data = data
+        self.user_ids = user_ids
+        self.topic_ids = topic_ids
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        user, topic, y = self.data[index]
+
+        user = self.user_ids.index(user)
+        user = torch.tensor(user)
+
+        topic = self.topic_ids.index(topic)
+        topic = torch.tensor(topic)
+        y = torch.tensor([y])
+        return user, topic, y
+
+
 """
 Testing Procedure:
 test set consists of a single interaction for each user (or a subset of users)
 that was removed from the training set.
 """
 
-class LeaveOneOutDS(Dataset):
-    def __init__(self, df, test_user_frac=0.5, train_negative_frac=1.0, test_sample_strat="newest"):
+class LeaveOneOutSplitter:
+    def __init__(self,
+                 df,
+                 test_user_frac=0.5,
+                 train_negative_frac=1.0,
+                 test_sample_strat="newest",
+                 ):
         if test_sample_strat not in ['newest', 'random']:
             print("'test_sample_strat' should either be 'newest' or 'random'!")
             return
@@ -87,82 +113,55 @@ class LeaveOneOutDS(Dataset):
 
         test_size = int(test_user_frac * len(self.user_ids))
 
-        self.test_samples = []
+        test_samples = []
         if self.test_sample_strat == 'random':
-            
             for id in self.user_ids:
                 user_interactions = list(filter(lambda x: x[0] == id, interactions))
                 s = random.choice(user_interactions)
-                self.test_samples.append(s)
-                
+                test_samples.append(s)
         else:
             user_last_event = df[['user_id', 'event_date']].groupby('user_id').max()
             df['test_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
-            self.test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
+            test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
         
-        self.test_samples = random.sample(self.test_samples, test_size)
+        test_samples = random.sample(test_samples, test_size)
 
-        for s in self.test_samples:
+        self.test_data = []
+        for user_id, topic_id in test_samples:
+            for t in self.topic_ids:
+                label = 1.0 if topic_id == t else 0.0
+                self.test_data.append((user_id, t, label))
+
+
+        for s in test_samples:
             interactions.remove(s)
 
-            
 
         positives = set(interactions)
         negatives = random.sample(list(no_interaction), int(train_negative_frac*len(positives)))
 
         self.data = [(x[0], x[1], 1.0) for x in positives] + [(x[0], x[1], 0.0) for x in negatives]
- 
 
-    def __len__(self):
-        return len(self.data)
+    def get_data(self):
+        return self.data
 
-    def __getitem__(self, index):
-        user, topic, y = self.data[index]
+    def get_test_data(self):
+        return self.test_data
 
-        user = self.user_ids.index(user)
-        user = torch.tensor(user)
+    def get_num_students(self):
+        return self.num_students
 
-        topic = self.topic_ids.index(topic)
-        topic = torch.tensor(topic)
+    def get_num_topics(self):
+        return self.num_topics
 
-        y = torch.tensor([y])
-        return user, topic, y
+    def get_user_ids(self):
+        return self.user_ids
 
+    def get_topic_ids(self):
+        return self.topic_ids
 
+    def get_train_dataset(self):
+        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
 
-class TransactionsStudentsTopicsDS(Dataset):
-    def __init__(self, df, user_ids, topic_ids, negative_frac=1.0):
-
-        self.user_ids = user_ids
-        self.topic_ids = topic_ids
-
-     
-        interactions = list(df.groupby(['user_id', 'topic_id']).count().index)
-
-        all_pairings = {(user, topic) for user in user_ids for topic in topic_ids}
-        positives = set(interactions)
-        no_interaction = all_pairings - positives
-        negatives = random.sample(list(no_interaction), int(negative_frac*len(positives)))
-
-        self.data = [(x[0], x[1], 1.0) for x in positives] + [(x[0], x[1], 0.0) for x in negatives]
-        
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        user, topic, y = self.data[index]
-
-        user = self.user_ids.index(user)
-        user = torch.tensor(user)
-
-        topic = self.topic_ids.index(topic)
-        topic = torch.tensor(topic)
-
-        y = torch.tensor([y])
-        return user, topic, y
-
-
-def get_transactions_dataloader(dataframe, user_ids, topic_ids, batch_size, negative_frac=1.0):
-    dataset = TransactionsStudentsTopicsDS(dataframe, user_ids, topic_ids, negative_frac=negative_frac)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    def get_test_dataset(self):
+        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())

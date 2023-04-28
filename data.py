@@ -165,3 +165,45 @@ class LeaveOneOutSplitter:
 
     def get_test_dataset(self):
         return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())
+
+
+
+class ItemKNNSplitter:
+    def __init__(self,
+                 df,
+                 test_user_frac=0.5,
+                 ):
+        
+        events_df = df[~df['topic_id'].isna()]
+
+        interactions = events_df[['user_id', 'topic_id', 'event_id']].groupby(['user_id', 'topic_id']).count()
+        interactions = interactions[interactions['event_id'] >= 5]
+        interactions_index = interactions.index
+
+        interactions = interactions.reset_index()
+        interactions = interactions.rename(columns={'event_id': 'count'})
+
+        self.matrix = interactions.pivot_table(index='topic_id', columns='user_id', values='count')
+        self.matrix = self.matrix.subtract(self.matrix.mean(axis=1), axis=0)
+
+        user_ids = list(set(map(lambda x: x[0], list(interactions_index))))
+
+        test_size = int(test_user_frac * len(user_ids))
+
+        user_ids = random.sample(user_ids, test_size)
+
+        self.test_samples = []
+
+        for uid in user_ids:
+            tid = random.choice(self.matrix[~self.matrix[uid].isna()].reset_index()['topic_id'])
+            val = self.matrix[uid][tid]
+            self.matrix[uid][tid] = np.nan
+            self.test_samples.append((uid, tid, val))
+
+
+   
+    def get_matrix(self):
+        return self.matrix
+
+    def get_test_samples(self):
+        return self.test_samples

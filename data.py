@@ -195,20 +195,16 @@ class LeaveOneOutDS(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        items = self.data[index]
+        user, topic, features, y = self.data[index]
 
-        user = items[0]
         user = self.user_ids.index(user)
         user = torch.tensor(user)
 
-        topic = items[1]
         topic = self.topic_ids.index(topic)
         topic = torch.tensor(topic)
 
-        y = items[-1]
         y = torch.tensor([y])
-        return user, topic, *items[2:-1], y
-    
+        return user, topic, features, y
 
 
 """
@@ -398,6 +394,8 @@ class ItemKNNSplitter:
         self.matrix = interactions.pivot_table(index='topic_id', columns='user_id', values='count')
         # self.matrix = self.matrix.subtract(self.matrix.mean(axis=1), axis=0)
 
+        self.topics = list(self.matrix.index)
+
         user_ids = list(set(map(lambda x: x[0], list(interactions_index))))
 
         test_size = int(test_user_frac * len(user_ids))
@@ -408,9 +406,10 @@ class ItemKNNSplitter:
 
         for uid in user_ids:
             tid = random.choice(self.matrix[~self.matrix[uid].isna()].reset_index()['topic_id'])
-            val = self.matrix[uid][tid]
+            # val = self.matrix[uid][tid]
             self.matrix[uid][tid] = np.nan
-            self.test_samples.append((uid, tid, val))
+            for t in self.topics:
+                self.test_samples.append((uid, t, float(t==tid)))
 
 
    

@@ -320,14 +320,14 @@ class LeaveOneOutSplitter:
             if self.use_features:
                 features.append(self._get_user_feature(x[0]))
                 features.append(self._get_topic_feature(x[1]))
-            self.data.append((x[0], x[1], *features, 1.0))
+            self.data.append((x[0], x[1], features, 1.0))
 
         for x in negatives:
             features = []
             if self.use_features:
                 features.append(self._get_user_feature(x[0]))
                 features.append(self._get_topic_feature(x[1]))
-            self.data.append((x[0], x[1], *features, 0.0))
+            self.data.append((x[0], x[1], features, 0.0))
 
             
     def get_data(self):

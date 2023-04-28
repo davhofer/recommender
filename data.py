@@ -12,6 +12,11 @@ def preprocess_events(df):
     df['session_id'] = df['session_id'].astype(int)
     df['event_date'] = pd.to_datetime(df['event_date'])
 
+    df['action'] = df['action'].replace('VIEW_QUESTION', 'tmp')
+    df['action'] = df['action'].replace('REVIEW_TASK', 'VIEW_QUESTION')
+    df['action'] = df['action'].replace('tmp', 'REVIEW_TASK')
+
+
     def first(x):
         return list(x)[0]
 
@@ -114,8 +119,10 @@ class LeaveOneOutDS(Dataset):
     def __getitem__(self, index):
         user, topic, y = self.data[index]
 
+        user = self.user_ids.index(user)
         user = torch.tensor(user)
 
+        topic = self.topic_ids.index(topic)
         topic = torch.tensor(topic)
 
         y = torch.tensor([y])

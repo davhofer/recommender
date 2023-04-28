@@ -85,7 +85,9 @@ class NCFNetwork(pl.LightningModule):
         self.predict_proba = torch.Tensor()
 
     def test_step(self, batch, batch_idx):
-        y_proba = self(*batch[:-1])
+        student_x, topic_x, features_x, y = batch
+
+        y_proba = self(student_x, topic_x, features_x)
 
         self.predict_proba = torch.cat((self.predict_proba, y_proba.detach().cpu()))
 

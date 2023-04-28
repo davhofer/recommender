@@ -2,26 +2,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def epoch_error_plot(model_error_dict, epochs):
+def iteration_error_plot(model_error_dict):
     """
     @args: 
-    model_error_dict: dict {'model_name': model_error_list} indicates training error according to each epoch
+    model_error_dict: dict {'model_name': [model_error_list, iteration]} indicates training error according to each epoch
     """
 
-    for model_name, model_error in model_error_dict.items():
-        plt.plot(epochs, model_error, label=model_name)
+    for model_name, error_log in model_error_dict.items():
+        error_list, iteration = error_log[0], error_log[1]
+        plt.plot(iteration, error_list, label=model_name)
 
     # add labels and title
-    plt.xlabel('Number of Epochs')
+    plt.xlabel('Number of Iterations')
     plt.ylabel('Training Error')
-    plt.title('Training Error vs. Number of Epochs')
+    plt.title('Training Error vs. Number of Iterations')
     plt.legend()
 
     # display the plot
     plt.show()
-    
 
-def predictive_factor_eval_plot(factor_arr, hr_dict, ndcg_dict, n=10):
+def predictive_factor_eval_plot(factor_arr, hr_dict, ndcg_dict, n):
     """
     @args: 
     factor_arr: list of predictive factors of NCF model 
@@ -84,16 +84,14 @@ if __name__ == '__main__':
     # Toy example
 
     # example training error values
-    # training_error = {'test_model 1': [0.2, 0.15, 0.1, 0.08, 0.06, 0.05], 'test_model 2': [0.5, 0.5, 0.4, 0.18, 0.16, 0.1]}
+    training_error = {'test_model 1': [[0.2, 0.15, 0.1, 0.08, 0.06, 0.05], [1, 2, 3, 4, 5, 6]], 'test_model 2': [[0.5, 0.5, 0.4, 0.18, 0.16, 0.1], [1, 2, 3, 4, 5, 6]]}
 
-    # # corresponding epoch numbers
-    # epochs = [1, 2, 3, 4, 5, 6]
-    # epoch_error_plot(training_error, epochs)
+    iteration_error_plot(training_error)
 
-    # hr_dict = {'test_model 1': [0.2, 0.15, 0.1, 0.09], 'test_model 2': [0.5, 0.5, 0.4, 0.18]}
-    # ndcg_dict = {'test_model 1': [0.2, 0.15, 0.1, 0.09], 'test_model 2': [0.5, 0.5, 0.4, 0.18]}
-    # factor_arr = [8, 16, 32, 64]
-    # predictive_factor_eval_plot(factor_arr, hr_dict, ndcg_dict, n=10)
+    hr_dict = {'test_model 1': [0.2, 0.15, 0.1, 0.09], 'test_model 2': [0.5, 0.5, 0.4, 0.18]}
+    ndcg_dict = {'test_model 1': [0.2, 0.15, 0.1, 0.09], 'test_model 2': [0.5, 0.5, 0.4, 0.18]}
+    factor_arr = [8, 16, 32, 64]
+    predictive_factor_eval_plot(factor_arr, hr_dict, ndcg_dict, n=10)
 
     hr_dict = {'test_model 1': [0.2, 0.15, 0.1, 0.09], 'test_model 2': [0.5, 0.5, 0.4, 0.18]}
     ndcg_dict = {'test_model 1': [0.2, 0.15, 0.1, 0.09], 'test_model 2': [0.5, 0.5, 0.4, 0.18]}

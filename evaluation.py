@@ -1,44 +1,11 @@
-from collections import defaultdict
-import pytorch_lightning as pl
-import torch
 import math
 import numpy as np
+import pandas as pd
 
-# def HitRate(model, eval_one_set, topic_ids, n=10):
-#     """
-#     @arg:
-#     test_data: list of [user, topic] - only positive interaction
-
-#     """
-#     hits = 0
-#     totals = eval_one_set.shape[0]
-
-#     # Load the model and return probability for each user with all topics
-#     # Output self.proba for each user/topic pair
-#     for user, topic in eval_one_set:
-#         test_set = torch.cat([user] * len(topic_ids), topic_ids)
-#         model.test(test_set)
-#         proba = model.predict_proba
-
-#         # Get the top N of highest probability and rank them 
-#         topN = [x for _, x in sorted(zip(proba, topic_ids), reverse=True)]
-#         hit = False
-#         for top_topic in topN:
-#             if (top_topic == topic):
-#                 hit = True
-#         if (hit):
-#             hits += 1
-        
-#     print(f"hits/total = {hits}/{totals}")
-#     return hits/totals
-
-
-def HitRate(model, eval_one_set, topic_ids, n=10):
+def HitRate_NDCG(proba_all_topic_csv, n=10):
     """
     @args:
-    model:
-    eval_one_set: list of [user, topic] - only positive interaction
-    topic_ids: list of all topics 
+    proba_all_topic_csv: {user_id, topic_id, was_interaction, predict_proba} csv file return recommendation probability for every topic 
     n: keep top n topic recommendation
 
     @output:
@@ -47,25 +14,21 @@ def HitRate(model, eval_one_set, topic_ids, n=10):
     """
     hit_list = []
     ndcg_list = []
-    
-    # Load the model and return probability for each user with all topics
-    # Output self.proba for each user/topic pair
-    for user, topic in eval_one_set:
-        test_set = torch.cat([user] * len(topic_ids), topic_ids)
-        model.test(test_set)
-        proba = model.predict_proba
+    proba_all_topic_df = pd.read_csv(proba_all_topic_csv)
+    user_predict = proba_all_topic_df.groupby(['user_id'])
 
+    for user, topic in user_predict:
+        #print(topic)
         # Get the top N of highest probability and rank them 
-        topN = [x for _, x in sorted(zip(proba, topic_ids), reverse=True)][:n]
-        
+        topN = [x for _, x in sorted(zip(topic['predict_proba'], topic['topic_id']), reverse=True)][:n]
+        positive_topic = int(topic[topic['was_interaction']==1]['topic_id'])
         # Calculate hit rate
-        hit_list.append(getHitRatio(topN, topic))
+        hit_list.append(getHitRatio(topN, positive_topic))
         
         # Calculate NDCG
-        ndcg_list.append(getNDCG(topN, topic))
+        ndcg_list.append(getNDCG(topN, positive_topic))
         
-    print(f'HR@{n}: {np.array(hit_list).mean()}, NDCG@{n}: {np.array(ndcg_list).mean()}')
-    return (hit_list, ndcg_list)
+    return np.array(hit_list).mean(), np.array(ndcg_list).mean()
 
 
 def getHitRatio(ranklist, topic):
@@ -80,3 +43,6 @@ def getNDCG(ranklist, topic):
         if item == topic:
             return math.log(2) / math.log(i+2)
     return 0
+if __name__ == '__main__':
+    HitRate('ncf_64_predictive_factors_first_try_outputs.csv', 5)
+    

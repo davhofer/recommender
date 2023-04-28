@@ -291,7 +291,7 @@ class LeaveOneOutSplitter:
             if self.use_features:
                 features.append(self._get_user_feature(user_id))
                 features.append(self._get_topic_feature(topic_id))
-            self.val_data.append((user_id, topic_id, *features, 1.0))
+            self.val_data.append((user_id, topic_id, features, 1.0))
 
         self.test_data = []
         for user_id, topic_id in test_samples:
@@ -301,7 +301,7 @@ class LeaveOneOutSplitter:
                     features.append(self._get_user_feature(user_id))
                     features.append(self._get_topic_feature(t))
                 label = 1.0 if topic_id == t else 0.0
-                self.test_data.append((user_id, t, *features, label))
+                self.test_data.append((user_id, t, features, label))
 
         for s in test_samples:
             interactions.remove(s)
@@ -342,8 +342,8 @@ class LeaveOneOutSplitter:
 
     def _get_user_feature(self, uid):
         if not self.use_features:
-            return
-        
+            return torch.Tensor()
+
         if uid not in self.user_features.index:
             return torch.zeros(self.num_user_features).float()
 
@@ -351,7 +351,7 @@ class LeaveOneOutSplitter:
 
     def _get_topic_feature(self, tid):
         if not self.use_features:
-            return
+            return torch.Tensor()
         
         if tid not in self.topic_features.index:
             return torch.zeros(self.num_topic_features).float()

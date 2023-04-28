@@ -49,22 +49,20 @@ class NCFNetwork(pl.LightningModule):
 
         self.save_hyperparameters()
 
-    def forward(self, *args):
-        student_x, topic_x = args[0], args[1]  
-
+    def forward(self, student_x, topic_x, features_x):
         student_emb = self.student_embedding_layer(student_x)
         topic_emb = self.topic_embedding_layer(topic_x)
 
-        x = torch.cat((student_emb, topic_emb, *args[2:]), 1)
+        x = torch.cat((student_emb, topic_emb, features_x), 1)
 
         proba = self.network(x)
 
         return proba
 
     def training_step(self, batch, batch_idx):
-        y = batch[-1]
+        student_x, topic_x, features_x, y = batch
 
-        y_proba = self(*batch[:-1])
+        y_proba = self(student_x, topic_x, features_x)
 
         loss = self.loss(y_proba, y)
 
@@ -75,9 +73,9 @@ class NCFNetwork(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        y = batch[-1]
+        student_x, topic_x, features_x, y = batch
 
-        y_proba = self(*batch[:-1])
+        y_proba = self(student_x, topic_x, features_x)
 
         loss = self.loss(y_proba, y)
 

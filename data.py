@@ -275,20 +275,7 @@ class LeaveOneOutSplitter:
             df['test_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
             val_test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
 
-        val_samples = random.sample(val_test_samples, val_size)
-        for s in val_samples:
-            val_test_samples.remove(s)
-
         test_samples = random.sample(val_test_samples, test_size)
-
-        self.val_data = []
-        for user_id, topic_id in val_samples:
-            features = []
-            if self.use_features:
-                features.append(self._get_user_feature(user_id))
-                features.append(self._get_topic_feature(topic_id))
-            self.val_data.append((user_id, topic_id, features, 1.0))
-
         self.test_data = []
         for user_id, topic_id in test_samples:
             for t in self.topic_ids:
@@ -299,11 +286,33 @@ class LeaveOneOutSplitter:
                 label = 1.0 if topic_id == t else 0.0
                 self.test_data.append((user_id, t, features, label))
 
-        for s in test_samples:
-            interactions.remove(s)
+        for s in self.test_data:
+            t = (s[0], s[1])
+            if t in val_test_samples:
+                val_test_samples.remove((s[0], s[1]))
 
-        for s in val_samples:
-            interactions.remove(s)
+        val_samples = random.sample(val_test_samples, val_size)
+        self.val_data = []
+        for user_id, topic_id in val_samples:
+            features = []
+            if self.use_features:
+                features.append(self._get_user_feature(user_id))
+                features.append(self._get_topic_feature(topic_id))
+            self.val_data.append((user_id, topic_id, features, 1.0))
+
+        for s in self.test_data:
+            t = (s[0], s[1])
+            if t in positives:
+                positives.remove((s[0], s[1]))
+            if t in no_interaction:
+                no_interaction.remove((s[0], s[1]))
+
+        for s in self.val_data:
+            t = (s[0], s[1])
+            if t in positives:
+                positives.remove((s[0], s[1]))
+            if t in no_interaction:
+                no_interaction.remove((s[0], s[1]))
 
 
         positives = set(interactions)

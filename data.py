@@ -216,6 +216,9 @@ that was removed from the training set.
 class LeaveOneOutSplitter:
     def __init__(self,
                  df,
+                 use_features=False,
+                 user_features=None,
+                 topic_features=None,
                  test_user_frac=0.5,
                  train_negative_frac=1.0,
                  test_sample_strat="newest",
@@ -228,6 +231,22 @@ class LeaveOneOutSplitter:
         self.train_negative_frac = train_negative_frac
         self.test_sample_strat = test_sample_strat
 
+        self.use_features = use_features
+        self.user_features = user_features
+        self.topic_features = topic_features
+
+        if self.use_features:
+            if self.user_features is None or self.topic_features is None:
+                print("No features have been passed but use_features is True. Init failed!")
+                return 
+            
+            self.num_user_features = self.user_features.shape[1]
+
+            self.num_topic_features = self.topic_features.shape[1]
+        
+        else:
+            self.num_user_features = 0
+            self.num_topic_features = 0
 
         self.user_ids = list(df['user_id'].unique())
         self.topic_ids = list(df['topic_id'].unique())
@@ -256,11 +275,17 @@ class LeaveOneOutSplitter:
         
         test_samples = random.sample(test_samples, test_size)
 
+
+
         self.test_data = []
         for user_id, topic_id in test_samples:
             for t in self.topic_ids:
+                features = []
+                if self.use_features:
+                    features.append(self._get_user_feature(user_id))
+                    features.append(self._get_topic_feature(t))
                 label = 1.0 if topic_id == t else 0.0
-                self.test_data.append((user_id, t, label))
+                self.test_data.append((user_id, t, *features, label))
 
 
         for s in test_samples:
@@ -270,13 +295,47 @@ class LeaveOneOutSplitter:
         positives = set(interactions)
         negatives = random.sample(list(no_interaction), int(train_negative_frac*len(positives)))
 
-        self.data = [(x[0], x[1], 1.0) for x in positives] + [(x[0], x[1], 0.0) for x in negatives]
+        self.data = []
 
+        for x in positives:
+            features = []
+            if self.use_features:
+                features.append(self._get_user_feature(x[0]))
+                features.append(self._get_topic_feature(x[1]))
+            self.data.append((x[0], x[1], *features, 1.0))
+
+        for x in negatives:
+            features = []
+            if self.use_features:
+                features.append(self._get_user_feature(x[0]))
+                features.append(self._get_topic_feature(x[1]))
+            self.data.append((x[0], x[1], *features, 0.0))
+
+            
     def get_data(self):
         return self.data
 
     def get_test_data(self):
         return self.test_data
+    
+
+    def _get_user_feature(self, uid):
+        if not self.use_features:
+            return
+        
+        if uid not in self.user_features.index:
+            return torch.zeros(self.num_user_features).float()
+
+        return torch.tensor(self.user_features.loc[uid, :]).float()
+
+    def _get_topic_feature(self, tid):
+        if not self.use_features:
+            return
+        
+        if tid not in self.topic_features.index:
+            return torch.zeros(self.num_topic_features).float()
+
+        return torch.tensor(self.topic_features.loc[tid, :]).float()
 
     def get_num_students(self):
         return self.num_students
@@ -297,110 +356,110 @@ class LeaveOneOutSplitter:
         return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())
     
 
-class FeatureLeaveOneOutSplitter:
-    def __init__(self,
-                 df,
-                 user_features,
-                 topic_features,
-                 test_user_frac=0.5,
-                 train_negative_frac=1.0,
-                 test_sample_strat="newest",
-                 ):
-        if test_sample_strat not in ['newest', 'random']:
-            print("'test_sample_strat' should either be 'newest' or 'random'!")
-            return
+# class FeatureLeaveOneOutSplitter:
+#     def __init__(self,
+#                  df,
+#                  user_features,
+#                  topic_features,
+#                  test_user_frac=0.5,
+#                  train_negative_frac=1.0,
+#                  test_sample_strat="newest",
+#                  ):
+#         if test_sample_strat not in ['newest', 'random']:
+#             print("'test_sample_strat' should either be 'newest' or 'random'!")
+#             return
         
-        self.df = df 
-        self.train_negative_frac = train_negative_frac
-        self.test_sample_strat = test_sample_strat
+#         self.df = df 
+#         self.train_negative_frac = train_negative_frac
+#         self.test_sample_strat = test_sample_strat
 
-        self.user_features = user_features
-        self.topic_features = topic_features
+#         self.user_features = user_features
+#         self.topic_features = topic_features
 
-        self.num_user_features = self.user_features.shape[1]
+#         self.num_user_features = self.user_features.shape[1]
 
-        self.num_topic_features = self.topic_features.shape[1]
+#         self.num_topic_features = self.topic_features.shape[1]
 
-        self.user_ids = list(df['user_id'].unique())
-        self.topic_ids = list(df['topic_id'].unique())
+#         self.user_ids = list(df['user_id'].unique())
+#         self.topic_ids = list(df['topic_id'].unique())
 
-        self.num_students = len(self.user_ids)
-        self.num_topics = len(self.topic_ids)
+#         self.num_students = len(self.user_ids)
+#         self.num_topics = len(self.topic_ids)
 
-        interactions = list(df.groupby(['user_id', 'topic_id']).count().index)
+#         interactions = list(df.groupby(['user_id', 'topic_id']).count().index)
 
-        all_pairings = {(user, topic) for user in self.user_ids for topic in self.topic_ids}
-        positives = set(interactions)
-        no_interaction = all_pairings - positives
+#         all_pairings = {(user, topic) for user in self.user_ids for topic in self.topic_ids}
+#         positives = set(interactions)
+#         no_interaction = all_pairings - positives
 
-        test_size = int(test_user_frac * len(self.user_ids))
+#         test_size = int(test_user_frac * len(self.user_ids))
 
-        test_samples = []
-        if self.test_sample_strat == 'random':
-            for id in self.user_ids:
-                user_interactions = list(filter(lambda x: x[0] == id, interactions))
-                s = random.choice(user_interactions)
-                test_samples.append(s)
-        else:
-            user_last_event = df[['user_id', 'event_date']].groupby('user_id').max()
-            df['test_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
-            test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
+#         test_samples = []
+#         if self.test_sample_strat == 'random':
+#             for id in self.user_ids:
+#                 user_interactions = list(filter(lambda x: x[0] == id, interactions))
+#                 s = random.choice(user_interactions)
+#                 test_samples.append(s)
+#         else:
+#             user_last_event = df[['user_id', 'event_date']].groupby('user_id').max()
+#             df['test_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
+#             test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
         
-        test_samples = random.sample(test_samples, test_size)
+#         test_samples = random.sample(test_samples, test_size)
 
-        self.test_data = []
-        for user_id, topic_id in test_samples:
-            for t in self.topic_ids:
-                label = 1.0 if topic_id == t else 0.0
-                self.test_data.append((user_id, t, self._get_user_feature(user_id), self._get_topic_feature(t), label))
-
-
-        for s in test_samples:
-            interactions.remove(s)
+#         self.test_data = []
+#         for user_id, topic_id in test_samples:
+#             for t in self.topic_ids:
+#                 label = 1.0 if topic_id == t else 0.0
+#                 self.test_data.append((user_id, t, self._get_user_feature(user_id), self._get_topic_feature(t), label))
 
 
-        positives = set(interactions)
-        negatives = random.sample(list(no_interaction), int(train_negative_frac*len(positives)))
+#         for s in test_samples:
+#             interactions.remove(s)
 
-        self.data = [(x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), 1.0) for x in positives] + [(x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), 0.0) for x in negatives]
 
-    def _get_user_feature(self, uid):
+#         positives = set(interactions)
+#         negatives = random.sample(list(no_interaction), int(train_negative_frac*len(positives)))
+
+#         self.data = [(x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), 1.0) for x in positives] + [(x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), 0.0) for x in negatives]
+
+#     def _get_user_feature(self, uid):
         
-        if uid not in self.user_features.index:
-            return torch.zeros(self.num_user_features).float()
+#         if uid not in self.user_features.index:
+#             return torch.zeros(self.num_user_features).float()
 
-        return torch.tensor(self.user_features.loc[uid, :]).float()
+#         return torch.tensor(self.user_features.loc[uid, :]).float()
 
-    def _get_topic_feature(self, tid):
+#     def _get_topic_feature(self, tid):
         
-        if tid not in self.topic_features.index:
-            return torch.zeros(self.num_topic_features).float()
+#         if tid not in self.topic_features.index:
+#             return torch.zeros(self.num_topic_features).float()
 
-        return torch.tensor(self.topic_features.loc[tid, :]).float()
+#         return torch.tensor(self.topic_features.loc[tid, :]).float()
 
-    def get_data(self):
-        return self.data
+#     def get_data(self):
+#         return self.data
 
-    def get_test_data(self):
-        return self.test_data
+#     def get_test_data(self):
+#         return self.test_data
 
-    def get_num_students(self):
-        return self.num_students
+#     def get_num_students(self):
+#         return self.num_students
 
-    def get_num_topics(self):
-        return self.num_topics
+#     def get_num_topics(self):
+#         return self.num_topics
 
-    def get_user_ids(self):
-        return self.user_ids
+#     def get_user_ids(self):
+#         return self.user_ids
 
-    def get_topic_ids(self):
-        return self.topic_ids
+#     def get_topic_ids(self):
+#         return self.topic_ids
 
-    def get_train_dataset(self):
-        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
+#     def get_train_dataset(self):
+#         return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
 
-    def get_test_dataset(self):
-        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())
+#     def get_test_dataset(self):
+#         return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())
 
 
 

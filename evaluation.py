@@ -2,7 +2,7 @@ import math
 import numpy as np
 import pandas as pd
 
-def HitRate_NDCG(proba_all_topic_csv, n=10):
+def HitRate_NDCG_MRR(proba_all_topic_csv, n=10):
     """
     @args:
     proba_all_topic_csv: {user_id, topic_id, was_interaction, predict_proba} csv file return recommendation probability for every topic 
@@ -14,6 +14,7 @@ def HitRate_NDCG(proba_all_topic_csv, n=10):
     """
     hit_list = []
     ndcg_list = []
+    mrr_list = []
     proba_all_topic_df = pd.read_csv(proba_all_topic_csv)
     user_predict = proba_all_topic_df.groupby(['user_id'])
 
@@ -27,9 +28,18 @@ def HitRate_NDCG(proba_all_topic_csv, n=10):
         
         # Calculate NDCG
         ndcg_list.append(getNDCG(topN, positive_topic))
-        
-    return np.array(hit_list).mean(), np.array(ndcg_list).mean()
 
+        #Calculate MRR
+        mrr_list.append(getMRR(topN, positive_topic))
+        
+    return np.array(hit_list).mean(), np.array(ndcg_list).mean(), np.array(mrr_list).mean()
+
+
+def getMRR(ranklist, topic):
+    for i in range(len(ranklist)):
+        if ranklist[i] == topic:
+            return 1/i
+    return 0
 
 def getHitRatio(ranklist, topic):
     for item in ranklist:
@@ -39,10 +49,11 @@ def getHitRatio(ranklist, topic):
 
 def getNDCG(ranklist, topic):
     for i in range(len(ranklist)):
-        item = ranklist[i]
-        if item == topic:
+        if ranklist[i] == topic:
             return math.log(2) / math.log(i+2)
     return 0
+
+
 if __name__ == '__main__':
-    HitRate('ncf_64_predictive_factors_first_try_outputs.csv', 5)
+    HitRate_NDCG_MRR('ncf_64_predictive_factors_first_try_outputs.csv', 5)
     

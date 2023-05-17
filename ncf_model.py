@@ -1,6 +1,9 @@
 import torch
 from torch import optim, nn
 import pytorch_lightning as pl
+import pandas as pd
+import numpy as np
+import math
 
 
 def get_MLP(in_size, out_size, num_layers, softmax_out=False, dimension_decay='linear'):
@@ -54,13 +57,21 @@ class NCFNetwork(pl.LightningModule):
                  use_features=False,
                  num_user_features=0,
                  num_topic_features=0,
+                 intermediate_size_divisor=2, # TODO: change to absolute value/size?
+                 input_MLP_num_layers=2,
+                 input_MLP_dimension_decay='linear',
+                 output_MLP_num_layers=3,
+                 output_MLP_dimension_decay='exponential',
                  loss=nn.BCELoss(),
+                 metric_k=10
                  ):
         super().__init__()
 
         self.use_features = use_features
         self.num_user_features = num_user_features
         self.num_topic_features = num_topic_features
+
+        self.metric_k = metric_k
 
         if self.use_features:
             if not (self.num_topic_features > 0 and self.num_user_features > 0):
@@ -70,23 +81,24 @@ class NCFNetwork(pl.LightningModule):
         self.student_embedding_layer = nn.Embedding(num_students, student_embedding_dim)
         self.topic_embedding_layer = nn.Embedding(num_topics, topic_embedding_dim)
 
-        # controls how much the size is reduced from the input to the intermediate layer
-        first_MLP_dimension_reduction = 2
-        first_MLP_layers = 2
+        # intermediate_size_divisor: controls how much the size is reduced from the input to the intermediate layer
 
-        self.user_embed_MLP = get_MLP(student_embedding_dim, student_embedding_dim//first_MLP_dimension_reduction, first_MLP_layers)
-        self.user_feature_MLP = get_MLP(num_user_features, num_user_features//first_MLP_dimension_reduction, first_MLP_layers)
-        self.topic_embed_MLP = get_MLP(topic_embedding_dim, topic_embedding_dim//first_MLP_dimension_reduction, first_MLP_layers)
-        self.topic_feature_MLP = get_MLP(num_topic_features, num_topic_features//first_MLP_dimension_reduction, first_MLP_layers)
+        self.user_embed_MLP = get_MLP(student_embedding_dim, student_embedding_dim//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
+        self.user_feature_MLP = get_MLP(num_user_features, num_user_features//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
+        self.topic_embed_MLP = get_MLP(topic_embedding_dim, topic_embedding_dim//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
+        self.topic_feature_MLP = get_MLP(num_topic_features, num_topic_features//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
         
-        intermediate_size = student_embedding_dim//first_MLP_dimension_reduction + topic_embedding_dim//first_MLP_dimension_reduction + self.num_user_features//first_MLP_dimension_reduction + self.num_topic_features//first_MLP_dimension_reduction
+        intermediate_size = student_embedding_dim//intermediate_size_divisor + topic_embedding_dim//intermediate_size_divisor + self.num_user_features//intermediate_size_divisor + self.num_topic_features//intermediate_size_divisor
+        
         print("intermediate layer size (concatenated):", intermediate_size)
 
-        self.network = get_MLP(intermediate_size, predictive_factors, 3, softmax_out=True, dimension_decay='exponential')
+        self.network = get_MLP(intermediate_size, predictive_factors, output_MLP_num_layers, softmax_out=True, dimension_decay=output_MLP_dimension_decay)
 
         self.loss = loss
 
         self.predict_proba = torch.Tensor()
+        self.eval_results = (torch.Tensor(), torch.Tensor(), torch.Tensor, torch.Tensor)
+
         self.loss_logs = []
 
         self.save_hyperparameters()
@@ -131,9 +143,35 @@ class NCFNetwork(pl.LightningModule):
         loss = self.loss(y_proba, y)
 
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        
+        students, topics, labels, probas = self.eval_results
+        students = torch.cat([students, student_x])
+        topics = torch.cat([topics, topic_x])
+        labels = torch.cat([labels, y])
+        probas = torch.cat([probas, y_proba.detach().cpu()])
+        self.eval_results = (students, topics, labels, probas)
+
+    def on_validation_epoch_start(self):
+        self.eval_results = (torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor())
+
+    def on_validation_epoch_end(self):
+        metrics = self.compute_metrics(self.metric_k)
+
+        for name in metrics.keys():
+            self.log(name, metrics[name])
+            print(name, metrics[name])
+
 
     def on_test_epoch_start(self):
         self.predict_proba = torch.Tensor()
+        self.eval_results = (torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor())
+
+
+    def on_test_epoch_end(self):
+        metrics = self.compute_metrics(self.metric_k)
+
+        for name in metrics.keys():
+            self.log(name, metrics[name])
 
     def test_step(self, batch, batch_idx):
         student_x, topic_x, student_features, topic_features, y = batch
@@ -142,6 +180,48 @@ class NCFNetwork(pl.LightningModule):
 
         self.predict_proba = torch.cat((self.predict_proba, y_proba.detach().cpu()))
 
+
+        students, topics, labels, probas = self.eval_results
+        students = torch.cat([students, student_x])
+        topics = torch.cat([topics, topic_x])
+        labels = torch.cat([labels, y])
+        probas = torch.cat([probas, y_proba.detach().cpu()])
+        self.eval_results = (students, topics, labels, probas)
+
+
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
+    
+    
+    def compute_metrics(self, k):
+        def getHitRatio(ranklist, topic):
+            return int(topic in ranklist)
+            
+        def getNDCG(ranklist, topic):
+            if topic not in ranklist:
+                return 0
+            return math.log(2) / math.log(ranklist.index(topic)+2)
+            
+
+        hit_list = []
+        ndcg_list = []
+
+        eval_results = self.eval_results
+        df = pd.DataFrame({'user_id': eval_results[0], 'topic_id': eval_results[1], 'was_interaction': eval_results[2].flatten(), 'predict_proba': eval_results[3].flatten()})
+
+        user_predict = df.groupby(['user_id'])
+
+        for user, topic in user_predict:
+            # Get the top N of highest probability and rank them 
+            topN = [x for _, x in sorted(zip(topic['predict_proba'], topic['topic_id']), reverse=True)][:k]
+            positive_topic = int(topic[topic['was_interaction']==1]['topic_id'])
+            # Calculate hit rate
+            hit_list.append(getHitRatio(topN, positive_topic))
+            
+            # Calculate NDCG
+            ndcg_list.append(getNDCG(topN, positive_topic))
+            
+        return {f'HitRate@{k}': np.array(hit_list).mean(), f'NDCG@{k}': np.array(ndcg_list).mean()}
+
+

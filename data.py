@@ -223,8 +223,10 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
     interactions = list(df.groupby(['user_id', 'topic_id']).count().index)
 
     all_pairings = {(user, topic) for user in user_ids for topic in topic_ids}
+
     positives = set(interactions)
     non_interactions = all_pairings - positives
+
 
     test_size = int(test_user_frac * len(user_ids))
     val_size = int(val_user_frac * len(user_ids))
@@ -252,9 +254,8 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
     for user_id, topic_id in test_samples:
         for t in topic_ids:
             # don't add a user_topic pair if it is an interaction
-            if t != topic_id and (user_id, topic_id) in interactions:
+            if t != topic_id and (user_id, t) in interactions:
                 continue
-
             label = 1.0 if topic_id == t else 0.0
             test_data.append((user_id, t, label))
 
@@ -263,7 +264,7 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
     for user_id, topic_id in val_samples:
         for t in topic_ids:
             # don't add a user_topic pair if it is an interaction
-            if t != topic_id and (user_id, topic_id) in interactions:
+            if t != topic_id and (user_id, t) in interactions:
                 continue
 
             label = 1.0 if topic_id == t else 0.0

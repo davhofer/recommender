@@ -206,7 +206,7 @@ class LeaveOneOutDS(Dataset):
         y = torch.Tensor([y])
         return user, topic, user_f, topic_f, y
 
-
+# TODO: test how many negative examples in test/val set occur in training set
 
 def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat="newest"):
     if test_user_frac + val_user_frac > 1:

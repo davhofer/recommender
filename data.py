@@ -195,7 +195,7 @@ class LeaveOneOutDS(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        user, topic, features, y = self.data[index]
+        user, topic, user_f, topic_f, y = self.data[index]
 
         user = self.user_ids.index(user)
         user = torch.tensor(user)
@@ -203,8 +203,8 @@ class LeaveOneOutDS(Dataset):
         topic = self.topic_ids.index(topic)
         topic = torch.tensor(topic)
 
-        y = torch.tensor([y])
-        return user, topic, features, y
+        y = torch.Tensor([y])
+        return user, topic, user_f, topic_f, y
 
 
 
@@ -355,32 +355,23 @@ class LeaveOneOutSplitter:
             self.num_topic_features = 0
 
 
-        test_data, val_data, test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat)
+        train_data, val_data, test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat)
+
+        
+
 
         # add features
         self.data = []
-        for user_id, topic_id, label in test_data:
-                features = []
-                if self.use_features:
-                    features.append(self._get_user_feature(user_id))
-                    features.append(self._get_topic_feature(topic_id))
-                self.data.append((user_id, topic_id, features, label))
+        for user_id, topic_id, label in train_data:
+                self.data.append((user_id, topic_id, self._get_user_feature(user_id), self._get_topic_feature(topic_id), label))
 
         self.val_data = []
         for user_id, topic_id, label in val_data:
-                features = []
-                if self.use_features:
-                    features.append(self._get_user_feature(user_id))
-                    features.append(self._get_topic_feature(topic_id))
-                self.val_data.append((user_id, topic_id, features, label))
+                self.val_data.append((user_id, topic_id, self._get_user_feature(user_id), self._get_topic_feature(topic_id), label))
 
         self.test_data = []
         for user_id, topic_id, label in test_data:
-                features = []
-                if self.use_features:
-                    features.append(self._get_user_feature(user_id))
-                    features.append(self._get_topic_feature(topic_id))
-                self.test_data.append((user_id, topic_id, features, label))
+                self.test_data.append((user_id, topic_id, self._get_user_feature(user_id), self._get_topic_feature(topic_id), label))
 
             
     def get_data(self):

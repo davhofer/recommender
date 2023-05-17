@@ -207,6 +207,90 @@ class LeaveOneOutDS(Dataset):
         return user, topic, features, y
 
 
+
+def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat="newest"):
+    if test_user_frac + val_user_frac > 1:
+            print("'test_user_frac' + 'val_user_frac' must be <= 1.0")
+            return
+    if test_sample_strat not in ['newest', 'random']:
+            print("'test_sample_strat' should either be 'newest' or 'random'!")
+            return
+    
+
+    user_ids = list(df['user_id'].unique())
+    topic_ids = list(df['topic_id'].unique())
+
+    interactions = list(df.groupby(['user_id', 'topic_id']).count().index)
+
+    all_pairings = {(user, topic) for user in user_ids for topic in topic_ids}
+    positives = set(interactions)
+    non_interactions = all_pairings - positives
+
+    test_size = int(test_user_frac * len(user_ids))
+    val_size = int(val_user_frac * len(user_ids))
+
+
+
+    val_test_interactions = []
+    if test_sample_strat == 'random':
+        for id in user_ids:
+            user_interactions = list(filter(lambda x: x[0] == id, interactions))
+            s = random.choice(user_interactions)
+            val_test_interactions.append(s)
+    else:
+        user_last_event = df[['user_id', 'event_date']].groupby('user_id').max()
+        df['test_val_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
+        val_test_interactions = list(df[df['test_val_set']].groupby(['user_id', 'topic_id']).count().index)
+
+    # get test interactions
+    test_samples = random.sample(val_test_interactions, test_size)
+    # get validation interactions. make sure there is no overlap
+    val_samples = random.sample(list(set(val_test_interactions) - set(test_samples)), val_size)
+
+    # add other user-topic pairs that are not in the interactions set in order to rank the test sample
+    test_data = []
+    for user_id, topic_id in test_samples:
+        for t in topic_ids:
+            # don't add a user_topic pair if it is an interaction
+            if t != topic_id and (user_id, topic_id) in interactions:
+                continue
+
+            label = 1.0 if topic_id == t else 0.0
+            test_data.append((user_id, t, label))
+
+    # add other user-topic pairs that are not in the interactions set in order to rank the test sample
+    val_data = []
+    for user_id, topic_id in val_samples:
+        for t in topic_ids:
+            # don't add a user_topic pair if it is an interaction
+            if t != topic_id and (user_id, topic_id) in interactions:
+                continue
+
+            label = 1.0 if topic_id == t else 0.0
+            val_data.append((user_id, t, label))
+
+    positives = set(interactions) - set(val_test_interactions)
+
+    #####################################################################################
+    # TODO: do we include the negative samples from the training set in the test/val set?
+    #####################################################################################
+
+    negatives = random.sample(list(non_interactions), int(train_negative_frac*len(positives)))
+
+    train_data = []
+
+    for x in positives:
+        train_data.append((x[0], x[1], 1.0))
+
+    for x in negatives:
+        train_data.append((x[0], x[1], 0.0))
+
+    return train_data, val_data, test_data
+
+    
+
+
+
 """
 Testing Procedure:
 test set consists of a single interaction for each user (or a subset of users)
@@ -215,7 +299,7 @@ that was removed from the training set.
 
 class LeaveOneOutSplitter:
     def __init__(self,
-                 df,
+                 preprocessed_df,
                  use_features=False,
                  user_features=None,
                  topic_features=None,
@@ -228,13 +312,34 @@ class LeaveOneOutSplitter:
             print("'test_sample_strat' should either be 'newest' or 'random'!")
             return
         
-        self.df = df 
+        """
+        TODO: adapt train/test split
+        - no negative samples in test and val set
+        - instead, just ignore interactions which appear in train & val set, i.e. don't make predictions for those interactions, eliminate them from the ranking
+
+        global interactions, non-interactions
+        train set: pos = subset of all interactions, neg = subset of all non-interactions
+        val set: pos = disjoint subset of all interactions, neg = all non-interactions for those interactions users
+        """
+
+        self.df = preprocessed_df 
         self.train_negative_frac = train_negative_frac
         self.test_sample_strat = test_sample_strat
 
         self.use_features = use_features
         self.user_features = user_features
         self.topic_features = topic_features
+
+        self.user_ids = list(self.df['user_id'].unique())
+        self.topic_ids = list(self.df['topic_id'].unique())
+
+        self.num_students = len(self.user_ids)
+        self.num_topics = len(self.topic_ids)
+
+
+        if test_user_frac + val_user_frac > 1:
+            print("'test_user_frac' + 'val_user_frac' must be <= 1.0")
+            return 
 
         if self.use_features:
             if self.user_features is None or self.topic_features is None:
@@ -249,81 +354,33 @@ class LeaveOneOutSplitter:
             self.num_user_features = 0
             self.num_topic_features = 0
 
-        self.user_ids = list(df['user_id'].unique())
-        self.topic_ids = list(df['topic_id'].unique())
 
-        self.num_students = len(self.user_ids)
-        self.num_topics = len(self.topic_ids)
+        test_data, val_data, test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat)
 
-        interactions = list(df.groupby(['user_id', 'topic_id']).count().index)
-
-        all_pairings = {(user, topic) for user in self.user_ids for topic in self.topic_ids}
-        positives = set(interactions)
-        no_interaction = all_pairings - positives
-
-        test_size = int(test_user_frac * len(self.user_ids))
-        val_size = int(val_user_frac * len(self.user_ids))
-
-        val_test_samples = []
-        if self.test_sample_strat == 'random':
-            for id in self.user_ids:
-                user_interactions = list(filter(lambda x: x[0] == id, interactions))
-                s = random.choice(user_interactions)
-                val_test_samples.append(s)
-        else:
-            user_last_event = df[['user_id', 'event_date']].groupby('user_id').max()
-            df['test_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
-            val_test_samples = list(df[df['test_set']].groupby(['user_id', 'topic_id']).count().index)
-
-        val_samples = random.sample(val_test_samples, val_size)
-        for s in val_samples:
-            val_test_samples.remove(s)
-
-        test_samples = random.sample(val_test_samples, test_size)
-
-        self.val_data = []
-        for user_id, topic_id in val_samples:
-            features = []
-            if self.use_features:
-                features.append(self._get_user_feature(user_id))
-                features.append(self._get_topic_feature(topic_id))
-            self.val_data.append((user_id, topic_id, features, 1.0))
-
-        self.test_data = []
-        for user_id, topic_id in test_samples:
-            for t in self.topic_ids:
+        # add features
+        self.data = []
+        for user_id, topic_id, label in test_data:
                 features = []
                 if self.use_features:
                     features.append(self._get_user_feature(user_id))
-                    features.append(self._get_topic_feature(t))
-                label = 1.0 if topic_id == t else 0.0
-                self.test_data.append((user_id, t, features, label))
+                    features.append(self._get_topic_feature(topic_id))
+                self.data.append((user_id, topic_id, features, label))
 
-        for s in test_samples:
-            interactions.remove(s)
+        self.val_data = []
+        for user_id, topic_id, label in val_data:
+                features = []
+                if self.use_features:
+                    features.append(self._get_user_feature(user_id))
+                    features.append(self._get_topic_feature(topic_id))
+                self.val_data.append((user_id, topic_id, features, label))
 
-        for s in val_samples:
-            interactions.remove(s)
-
-
-        positives = set(interactions)
-        negatives = random.sample(list(no_interaction), int(train_negative_frac*len(positives)))
-
-        self.data = []
-
-        for x in positives:
-            features = []
-            if self.use_features:
-                features.append(self._get_user_feature(x[0]))
-                features.append(self._get_topic_feature(x[1]))
-            self.data.append((x[0], x[1], features, 1.0))
-
-        for x in negatives:
-            features = []
-            if self.use_features:
-                features.append(self._get_user_feature(x[0]))
-                features.append(self._get_topic_feature(x[1]))
-            self.data.append((x[0], x[1], features, 0.0))
+        self.test_data = []
+        for user_id, topic_id, label in test_data:
+                features = []
+                if self.use_features:
+                    features.append(self._get_user_feature(user_id))
+                    features.append(self._get_topic_feature(topic_id))
+                self.test_data.append((user_id, topic_id, features, label))
 
             
     def get_data(self):
@@ -379,7 +436,7 @@ class LeaveOneOutSplitter:
 class ItemKNNSplitter:
     def __init__(self,
                  df,
-                 test_user_frac=0.5,
+                 test_user_frac=0.5
                  ):
         
         events_df = df[~df['topic_id'].isna()]
@@ -403,6 +460,8 @@ class ItemKNNSplitter:
         user_ids = random.sample(user_ids, test_size)
 
         self.test_samples = []
+
+        # NOTE: we don't train anything here so we don't need a validation set
 
         for uid in user_ids:
             tid = random.choice(self.matrix[~self.matrix[uid].isna()].reset_index()['topic_id'])

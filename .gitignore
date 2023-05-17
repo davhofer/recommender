@@ -3,4 +3,4 @@ lightning_logs/*
 data/
 .ipynb_checkpoints/
 .idea
-
+__pycache__/

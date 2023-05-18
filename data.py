@@ -527,7 +527,7 @@ class SequentialSplitter:
         self.df['val_topic_seq'] = self.df['val_topic_seq'].apply(
             lambda x: x + [PAD_TOPIC_ID] * (max_seq_len_val - len(x)))
         self.df['test_topic_seq'] = self.df['test_topic_seq'].apply(
-            lambda x: x + [PAD_TOPIC] * (max_seq_len_test - len(x)))
+            lambda x: x + [PAD_TOPIC_ID] * (max_seq_len_test - len(x)))
 
         # extracting the data to lists
         train_topic_seq = list(self.df['train_topic_seq'])
@@ -571,4 +571,4 @@ class SequentialDS(Dataset):
     def __getitem__(self, index):
         topic_sequence, label_topic = self.data[index]
 
-        return torch.Tensor(topic_sequence), torch.Tensor([label_topic])
+        return torch.FloatTensor(topic_sequence), torch.FloatTensor([label_topic])

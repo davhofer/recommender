@@ -39,7 +39,7 @@ def HitRate_NDCG_MRR_from_CSV(proba_all_topic_csv, n=10):
     """
 
     proba_all_topic_df = pd.read_csv(proba_all_topic_csv)
-    metrics = compute_metrics(proba_all_topic_df, n)
+    metrics = HitRate_NDCG_MRR(proba_all_topic_df, n)
     return metrics
 
 def getMRR(ranklist, topic):

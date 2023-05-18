@@ -217,7 +217,7 @@ class LeaveOneOutDS(Dataset):
 
 # TODO: test how many negative examples in test/val set occur in training set
 
-def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat="newest"):
+def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat="newest", verbose=1):
     if test_user_frac + val_user_frac > 1:
             print("'test_user_frac' + 'val_user_frac' must be <= 1.0")
             return
@@ -253,6 +253,9 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
         df['test_val_set'] = df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
         val_test_interactions = list(df[df['test_val_set']].groupby(['user_id', 'topic_id']).count().index)
 
+    if verbose:
+        print("Sampled initial validation and test interactions")
+    
     # get test interactions
     test_samples = random.sample(val_test_interactions, test_size)
     # get validation interactions. make sure there is no overlap
@@ -268,6 +271,9 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
             label = 1.0 if topic_id == t else 0.0
             test_data.append((user_id, t, label))
 
+    if verbose:
+        print("Completed test dataset")
+
     # add other user-topic pairs that are not in the interactions set in order to rank the test sample
     val_data = []
     for user_id, topic_id in val_samples:
@@ -278,6 +284,9 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
 
             label = 1.0 if topic_id == t else 0.0
             val_data.append((user_id, t, label))
+
+    if verbose:
+        print("Completed validation dataset")
 
     positives = set(interactions) - set(val_test_interactions)
 
@@ -294,6 +303,8 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
 
     for x in negatives:
         train_data.append((x[0], x[1], 0.0))
+
+    print("Completed train dataset")
 
     return train_data, val_data, test_data
 
@@ -317,6 +328,7 @@ class LeaveOneOutSplitter:
                  val_user_frac=0.5,
                  train_negative_frac=1.0,
                  test_sample_strat="newest",
+                 verbose=1
                  ):
         if test_sample_strat not in ['newest', 'random']:
             print("'test_sample_strat' should either be 'newest' or 'random'!")
@@ -365,23 +377,17 @@ class LeaveOneOutSplitter:
             self.num_topic_features = 0
 
 
-        train_data, val_data, test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat)
+        train_data, val_data, test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat, verbose=verbose)
 
-        
-
+        if verbose:
+            print("Adding features...")
 
         # add features
-        self.data = []
-        for user_id, topic_id, label in train_data:
-                self.data.append((user_id, topic_id, self._get_user_feature(user_id), self._get_topic_feature(topic_id), label))
+        self.data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[2]), train_data))
+        
+        self.val_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[2]), val_data))
 
-        self.val_data = []
-        for user_id, topic_id, label in val_data:
-                self.val_data.append((user_id, topic_id, self._get_user_feature(user_id), self._get_topic_feature(topic_id), label))
-
-        self.test_data = []
-        for user_id, topic_id, label in test_data:
-                self.test_data.append((user_id, topic_id, self._get_user_feature(user_id), self._get_topic_feature(topic_id), label))
+        self.test_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[2]), test_data))
 
             
     def get_data(self):

@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 import pandas as pd
 import numpy as np
 import math
+from evaluation import HitRate_NDCG_MRR
 
 
 def get_MLP(in_size, out_size, num_layers, softmax_out=False, dimension_decay='linear'):
@@ -195,33 +196,6 @@ class NCFNetwork(pl.LightningModule):
     
     
     def compute_metrics(self, k):
-        def getHitRatio(ranklist, topic):
-            return int(topic in ranklist)
-            
-        def getNDCG(ranklist, topic):
-            if topic not in ranklist:
-                return 0
-            return math.log(2) / math.log(ranklist.index(topic)+2)
-            
-
-        hit_list = []
-        ndcg_list = []
-
         eval_results = self.eval_results
         df = pd.DataFrame({'user_id': eval_results[0], 'topic_id': eval_results[1], 'was_interaction': eval_results[2].flatten(), 'predict_proba': eval_results[3].flatten()})
-
-        user_predict = df.groupby(['user_id'])
-
-        for user, topic in user_predict:
-            # Get the top N of highest probability and rank them 
-            topN = [x for _, x in sorted(zip(topic['predict_proba'], topic['topic_id']), reverse=True)][:k]
-            positive_topic = int(topic[topic['was_interaction']==1]['topic_id'])
-            # Calculate hit rate
-            hit_list.append(getHitRatio(topN, positive_topic))
-            
-            # Calculate NDCG
-            ndcg_list.append(getNDCG(topN, positive_topic))
-            
-        return {f'HitRate@{k}': np.array(hit_list).mean(), f'NDCG@{k}': np.array(ndcg_list).mean()}
-
-
+        return HitRate_NDCG_MRR(df, k)

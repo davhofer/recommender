@@ -382,12 +382,11 @@ class LeaveOneOutSplitter:
         if verbose:
             print("Adding features...")
 
-        self.change_features(self.user_features, self.topic_features)
+        self.change_features(self.use_features, self.user_features, self.topic_features)
 
 
-    def change_features(self, user_features, topic_features):
-        if not self.user_features:
-            print("NOTE: self.use_features is False")
+    def change_features(self, use_features, user_features, topic_features):
+        self.use_features = use_features
 
         self.user_features = user_features 
         self.topic_features = topic_features

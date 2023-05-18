@@ -377,19 +377,30 @@ class LeaveOneOutSplitter:
             self.num_topic_features = 0
 
 
-        train_data, val_data, test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat, verbose=verbose)
+        self.data, self.val_data, self.test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat, verbose=verbose)
 
         if verbose:
             print("Adding features...")
 
-        # add features
-        self.data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[2]), train_data))
+        self.change_features(self.user_features, self.topic_features)
+
+
+    def change_features(self, user_features, topic_features):
+        if not self.user_features:
+            print("NOTE: self.use_features is False")
+
+        self.user_features = user_features 
+        self.topic_features = topic_features
+
+
+        self.data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[-1]), self.data))
         
-        self.val_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[2]), val_data))
+        self.val_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[-1]), self.val_data))
 
-        self.test_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[2]), test_data))
+        self.test_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[-1]), self.test_data))
 
-            
+        
+
     def get_data(self):
         return self.data
 

@@ -571,4 +571,4 @@ class SequentialDS(Dataset):
     def __getitem__(self, index):
         topic_sequence, label_topic = self.data[index]
 
-        return torch.FloatTensor(topic_sequence), torch.FloatTensor([label_topic])
+        return torch.tensor(topic_sequence), torch.tensor([label_topic])

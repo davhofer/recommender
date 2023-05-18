@@ -5,7 +5,9 @@ import pandas as pd
 import numpy as np
 
 
-def preprocess_events(df, topics):
+def preprocess_events(df, topics, math=True, german=True):
+    assert math or german, "Either math or german must be set to True."
+
     df = df[~df['topic_id'].isna()]
     df = df[~df['session_id'].isna()]
 
@@ -58,6 +60,13 @@ def preprocess_events(df, topics):
 
     topics = topics[['id', 'math']].rename(columns={'id': 'topic_id', 'math': 'is_math'})
     df = pd.merge(left=df, right=topics, on='topic_id')
+
+
+    if not (math and german):
+        if math:
+            df = df[df['is_math']==1]
+        elif german:
+            df = df[df['is_math']==0]
 
     return df
 

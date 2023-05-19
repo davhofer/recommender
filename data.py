@@ -592,6 +592,6 @@ class SequentialDS(Dataset):
         topic_sequence = [self.topic_ids.index(t) if t != PAD_TOPIC_ID else t for t in topic_sequence]
 
         label_topic = self.topic_ids.index(label_topic)
-        label_topic = torch.tensor([label_topic])
+        label_topic = torch.tensor(label_topic)
 
         return torch.tensor(topic_sequence), torch.tensor(sequence_len), label_topic

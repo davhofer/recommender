@@ -95,3 +95,6 @@ class GRU4RecNetwork(pl.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
+    def on_test_epoch_start(self):
+        self.predict_proba = torch.Tensor()
+

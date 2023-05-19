@@ -33,3 +33,4 @@ def write_outputs(data, loss_logs, model_description, output_dir):
         for idx, loss_value in enumerate(loss_logs, 1):
             csv_out.writerow((loss_value, idx))
 
+    return probas_output_path, loss_outputs_path

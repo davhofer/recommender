@@ -589,7 +589,9 @@ class SequentialDS(Dataset):
     def __getitem__(self, index):
         topic_sequence, sequence_len, label_topic = self.data[index]
 
+        topic_sequence = [self.topic_ids.index(t) for t in topic_sequence]
+
         label_topic = self.topic_ids.index(label_topic)
-        label_topic = torch.tensor(label_topic)
+        label_topic = torch.tensor([label_topic])
 
         return torch.tensor(topic_sequence), torch.tensor([sequence_len]), label_topic

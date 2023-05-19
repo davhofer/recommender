@@ -43,7 +43,7 @@ class GRU4RecNetwork(pl.LightningModule):
         topic_sequence_embeddings = self.topic_embedding_layer(topic_sequence)
         topic_sequence_embeddings_dropout = self.dropout(topic_sequence_embeddings)
 
-        packed_topic_sequence = nn.utils.rnn.pack_padded_sequence(topic_sequence_embeddings, topic_sequence_len.cpu().numpy(), batch_first=True, enforce_sorted=False)
+        packed_topic_sequence = nn.utils.rnn.pack_padded_sequence(topic_sequence_embeddings_dropout, topic_sequence_len.cpu().numpy(), batch_first=True, enforce_sorted=False)
         packed_gru_output, _ = self.gru_layer(packed_topic_sequence)
         unpacked_gru_output, _ = nn.utils.rnn.pad_packed_sequence(packed_gru_output, batch_first=True)
 

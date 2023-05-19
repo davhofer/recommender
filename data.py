@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 
 
+PAD_TOPIC_ID = 0
+
+
 def preprocess_events(df, topics, math=True, german=True):
     assert math or german, "Either math or german must be set to True."
 
@@ -494,3 +497,101 @@ class ItemKNNSplitter:
 
     def get_test_samples(self):
         return self.test_samples
+
+
+class SequentialSplitter:
+    def __init__(self, preprocessed_df):
+        self.df = preprocessed_df
+
+        self.topic_ids = list(self.df['topic_id'].unique())
+        self.num_topics = len(self.topic_ids)
+
+        # grouping sorted by timestep topic interactions by user
+        self.df = self.df.sort_values(by='event_date')[['user_id', 'topic_id']].groupby('user_id').agg(
+            list).reset_index()
+        self.df = self.df.rename(columns={'topic_id': 'initial_topic_seq'})
+
+        # using last 3 topic ids in the sequence [... t1, t2, t3]: t1 -> for training, t2 for validation, t3 for testing
+        self.df['train_topic_id'] = self.df['initial_topic_seq'].apply(lambda x: x[-3])
+        self.df['val_topic_id'] = self.df['initial_topic_seq'].apply(lambda x: x[-2])
+        self.df['test_topic_id'] = self.df['initial_topic_seq'].apply(lambda x: x[-1])
+
+        self.df['train_topic_seq'] = self.df['initial_topic_seq'].apply(lambda x: x[:-3])
+        self.df['val_topic_seq'] = self.df['initial_topic_seq'].apply(lambda x: x[:-2])
+        self.df['test_topic_seq'] = self.df['initial_topic_seq'].apply(lambda x: x[:-1])
+
+        self.df['train_topic_seq_len'] = self.df['train_topic_seq'].apply(lambda x: len(x))
+        self.df['val_topic_seq_len'] = self.df['val_topic_seq'].apply(lambda x: len(x))
+        self.df['test_topic_seq_len'] = self.df['test_topic_seq'].apply(lambda x: len(x))
+
+        # padding the topic sequences
+        max_seq_len_train = self.df['train_topic_seq'].apply(lambda x: len(x)).max()
+        max_seq_len_val = max_seq_len_train + 1
+        max_seq_len_test = max_seq_len_train + 2
+
+        self.df['train_topic_seq'] = self.df['train_topic_seq'].apply(
+            lambda x: x + [PAD_TOPIC_ID] * (max_seq_len_train - len(x)))
+        self.df['val_topic_seq'] = self.df['val_topic_seq'].apply(
+            lambda x: x + [PAD_TOPIC_ID] * (max_seq_len_val - len(x)))
+        self.df['test_topic_seq'] = self.df['test_topic_seq'].apply(
+            lambda x: x + [PAD_TOPIC_ID] * (max_seq_len_test - len(x)))
+
+        # extracting the data to lists
+        train_topic_seq = list(self.df['train_topic_seq'])
+        val_topic_seq = list(self.df['val_topic_seq'])
+        test_topic_seq = list(self.df['test_topic_seq'])
+
+        train_topic_seq_len = self.df['train_topic_seq_len'].tolist()
+        val_topic_seq_len = self.df['val_topic_seq_len'].tolist()
+        test_topic_seq_len = self.df['test_topic_seq_len'].tolist()
+
+        train_label = self.df['train_topic_id'].tolist()
+        val_label = self.df['val_topic_id'].tolist()
+        test_label = self.df['test_topic_id'].tolist()
+
+        self.data = list(zip(train_topic_seq, train_topic_seq_len, train_label))
+        self.val_data = list(zip(val_topic_seq, val_topic_seq_len, val_label))
+        self.test_data = list(zip(test_topic_seq, test_topic_seq_len, test_label))
+
+    def get_num_topics(self):
+        return self.num_topics
+
+    def get_topic_ids(self):
+        return self.topic_ids
+
+    def get_data(self):
+        return self.data
+
+    def get_val_data(self):
+        return self.val_data
+
+    def get_test_data(self):
+        return self.test_data
+
+    def get_train_dataset(self):
+        return SequentialDS(self.get_data(), self.get_topic_ids())
+
+    def get_val_dataset(self):
+        return SequentialDS(self.get_val_data(), self.get_topic_ids())
+
+    def get_test_dataset(self):
+        return SequentialDS(self.get_test_data(), self.get_topic_ids())
+
+
+class SequentialDS(Dataset):
+    def __init__(self, data, topic_ids):
+        self.data = data
+        self.topic_ids = topic_ids
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        topic_sequence, sequence_len, label_topic = self.data[index]
+
+        topic_sequence = [self.topic_ids.index(t) if t != PAD_TOPIC_ID else t for t in topic_sequence]
+
+        label_topic = self.topic_ids.index(label_topic)
+        label_topic = torch.tensor(label_topic)
+
+        return torch.tensor(topic_sequence), torch.tensor(sequence_len), label_topic

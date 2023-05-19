@@ -2,6 +2,7 @@ import math
 import numpy as np
 import pandas as pd
 
+
 def HitRate_NDCG_MRR(df, n):
     hit_list = []
     ndcg_list = []
@@ -26,8 +27,18 @@ def HitRate_NDCG_MRR(df, n):
 
 
 
+def metrics_per_topic(df, n, math=True, german=True, math_ids=[], german_ids=[]):
+    metrics = dict()
+    if math:
+        math_df = df[df['topic_id'].isin(math_ids)]
+        metrics['math'] = HitRate_NDCG_MRR(math_df, n)
+    if german:
+        german_df = df[df['topic_id'].isin(german_ids)]
+        metrics['german'] = HitRate_NDCG_MRR(german_df, n)
 
-def HitRate_NDCG_MRR_from_CSV(proba_all_topic_csv, n=10):
+    return metrics
+
+def HitRate_NDCG_MRR_from_CSV(proba_all_topic_csv, n=10, math=True, german=True, math_ids=[], german_ids=[]):
     """
     @args:
     proba_all_topic_csv: {user_id, topic_id, was_interaction, predict_proba} csv file return recommendation probability for every topic 
@@ -39,7 +50,7 @@ def HitRate_NDCG_MRR_from_CSV(proba_all_topic_csv, n=10):
     """
 
     proba_all_topic_df = pd.read_csv(proba_all_topic_csv)
-    metrics = HitRate_NDCG_MRR(proba_all_topic_df, n)
+    metrics = metrics_per_topic(proba_all_topic_df, n, math=math, german=german, math_ids=math_ids, german_ids=german_ids)
     return metrics
 
 def getMRR(ranklist, topic):

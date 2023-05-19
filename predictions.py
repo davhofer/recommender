@@ -6,7 +6,7 @@ def get_predictions(data, probas, is_sequential=False):
         return [(item[0], item[1], item[3], proba.item()) for item, proba in zip(data, probas)]
 
     result = []
-    for user_id, user_data, user_probas in enumerate(zip(data, probas)):
+    for user_id, (user_data, user_probas) in enumerate(zip(data, probas)):
         interaction_topic = user_data[2]
         for topic_id, user_topic_proba in enumerate(user_probas):
             result.append((user_id, topic_id, topic_id == interaction_topic, user_topic_proba.item()))

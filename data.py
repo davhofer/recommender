@@ -511,6 +511,9 @@ class SequentialSplitter:
             list).reset_index()
         self.df = self.df.rename(columns={'topic_id': 'initial_topic_seq'})
 
+        # dropping sequences of length 3 or less because these would have empty training data
+        self.df = self.df[self.df['initial_topic_seq'].map(len) > 3]
+
         # using last 3 topic ids in the sequence [... t1, t2, t3]: t1 -> for training, t2 for validation, t3 for testing
         self.df['train_topic_id'] = self.df['initial_topic_seq'].apply(lambda x: x[-3])
         self.df['val_topic_id'] = self.df['initial_topic_seq'].apply(lambda x: x[-2])

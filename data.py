@@ -517,6 +517,10 @@ class SequentialSplitter:
         self.df['val_topic_seq'] = self.df['initial_topic_seq'].apply(lambda x: x[:-2])
         self.df['test_topic_seq'] = self.df['initial_topic_seq'].apply(lambda x: x[:-1])
 
+        self.df['train_topic_seq_len'] = self.df['train_topic_seq'].apply(lambda x: len(x))
+        self.df['val_topic_seq_len'] = self.df['val_topic_seq'].apply(lambda x: len(x))
+        self.df['test_topic_seq_len'] = self.df['test_topic_seq'].apply(lambda x: len(x))
+
         # padding the topic sequences
         max_seq_len_train = self.df['train_topic_seq'].apply(lambda x: len(x)).max()
         max_seq_len_val = max_seq_len_train + 1
@@ -534,13 +538,17 @@ class SequentialSplitter:
         val_topic_seq = list(self.df['val_topic_seq'])
         test_topic_seq = list(self.df['test_topic_seq'])
 
+        train_topic_seq_len = self.df['train_topic_seq_len'].tolist()
+        val_topic_seq_len = self.df['val_topic_seq_len'].tolist()
+        test_topic_seq_len = self.df['test_topic_seq_len'].tolist()
+
         train_label = self.df['train_topic_id'].tolist()
         val_label = self.df['val_topic_id'].tolist()
         test_label = self.df['test_topic_id'].tolist()
 
-        self.data = list(zip(train_topic_seq, train_label))
-        self.val_data = list(zip(val_topic_seq, val_label))
-        self.test_data = list(zip(test_topic_seq, test_label))
+        self.data = list(zip(train_topic_seq, train_topic_seq_len, train_label))
+        self.val_data = list(zip(val_topic_seq, val_topic_seq_len, val_label))
+        self.test_data = list(zip(test_topic_seq, test_topic_seq_len, test_label))
 
     def get_data(self):
         return self.data
@@ -562,13 +570,17 @@ class SequentialSplitter:
 
 
 class SequentialDS(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, topic_ids):
         self.data = data
+        self.topic_ids = topic_ids
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
-        topic_sequence, label_topic = self.data[index]
+        topic_sequence, sequence_len, label_topic = self.data[index]
 
-        return torch.tensor(topic_sequence), torch.tensor([label_topic])
+        label_topic = self.topic_ids.index(label_topic)
+        label_topic = torch.tensor(label_topic)
+
+        return torch.tensor(topic_sequence), torch.tensor([sequence_len]), label_topic

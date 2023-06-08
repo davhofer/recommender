@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 import pandas as pd
 import numpy as np
 import math
-from evaluation import HitRate_NDCG_MRR
+from evaluation import HitRate_NDCG_MRR, metrics_per_topic
 
 
 def get_MLP(in_size, out_size, num_layers, softmax_out=False, dimension_decay='linear'):
@@ -18,7 +18,10 @@ def get_MLP(in_size, out_size, num_layers, softmax_out=False, dimension_decay='l
 
     q = 1
     if dimension_decay == 'exponential':
-        q = (in_size/out_size)**(1/num_layers)
+        if not out_size:
+            q = 0
+        else:
+            q = (in_size/out_size)**(1/num_layers)
         layer_in_float = in_size * q
         layer_out_float = in_size
 
@@ -28,8 +31,12 @@ def get_MLP(in_size, out_size, num_layers, softmax_out=False, dimension_decay='l
             layer_in = in_size - int((in_size-out_size) * i/num_layers)
             layer_out = in_size - int((in_size-out_size) * (i+1)/num_layers)
         else:
-            layer_in_float = layer_in_float/q
-            layer_out_float = layer_out_float/q
+            if not q:
+                layer_in_float = 0
+                layer_out_float = 0
+            else:
+                layer_in_float = layer_in_float/q
+                layer_out_float = layer_out_float/q
 
             layer_in = round(layer_in_float)
             layer_out = round(layer_out_float)
@@ -64,13 +71,25 @@ class NCFNetwork(pl.LightningModule):
                  output_MLP_num_layers=3,
                  output_MLP_dimension_decay='exponential',
                  loss=nn.BCELoss(),
-                 metric_k=10
+                 metric_k=10,
+                 joint=False,
+                 user_ids=None,
+                 topic_ids=None,
+                 math_ids=None,
+                 german_ids=None,
                  ):
         super().__init__()
+
+        self.joint=joint 
+        self.math_ids = math_ids
+        self.german_ids = german_ids
 
         self.use_features = use_features
         self.num_user_features = num_user_features
         self.num_topic_features = num_topic_features
+
+        self.user_ids = user_ids
+        self.topic_ids = topic_ids 
 
         self.metric_k = metric_k
 
@@ -86,6 +105,8 @@ class NCFNetwork(pl.LightningModule):
 
         self.user_embed_MLP = get_MLP(student_embedding_dim, student_embedding_dim//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
         self.user_feature_MLP = get_MLP(num_user_features, num_user_features//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
+        
+        
         self.topic_embed_MLP = get_MLP(topic_embedding_dim, topic_embedding_dim//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
         self.topic_feature_MLP = get_MLP(num_topic_features, num_topic_features//intermediate_size_divisor, input_MLP_num_layers, dimension_decay=input_MLP_dimension_decay)
         
@@ -97,8 +118,8 @@ class NCFNetwork(pl.LightningModule):
 
         self.loss = loss
 
-        self.predict_proba = torch.Tensor()
-        self.eval_results = (torch.Tensor(), torch.Tensor(), torch.Tensor, torch.Tensor)
+        self.predict_proba = torch.Tensor().detach().cpu()
+        self.eval_results = (torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu())
 
         self.loss_logs = []
 
@@ -130,7 +151,7 @@ class NCFNetwork(pl.LightningModule):
 
         loss = self.loss(y_proba, y)
 
-        self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
 
         self.loss_logs.append(loss.item())
 
@@ -146,29 +167,86 @@ class NCFNetwork(pl.LightningModule):
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         
         students, topics, labels, probas = self.eval_results
-        students = torch.cat([students, student_x])
-        topics = torch.cat([topics, topic_x])
-        labels = torch.cat([labels, y])
+        students = torch.cat([students, student_x.detach().cpu()])
+        topics = torch.cat([topics, topic_x.detach().cpu()])
+        labels = torch.cat([labels, y.detach().cpu()])
         probas = torch.cat([probas, y_proba.detach().cpu()])
         self.eval_results = (students, topics, labels, probas)
 
     def on_validation_epoch_start(self):
-        self.eval_results = (torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor())
+        self.eval_results = (torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu())
 
     def on_validation_epoch_end(self):
+        if self.joint:
+            eval_results = self.eval_results
+            
+            topic_ids = list(map(lambda x: self.topic_ids[int(x)], eval_results[1]))
+            df = pd.DataFrame({'user_id': eval_results[0], 'topic_id': topic_ids, 'was_interaction': eval_results[2].flatten(), 'predict_proba': eval_results[3].flatten()})
+            
+            
+            metrics = metrics_per_topic(df, self.metric_k, math_ids=self.math_ids, german_ids=self.german_ids)
+            
+            
+
+            if 'math' in metrics.keys():
+                math_m = metrics['math']
+                for name in math_m.keys():
+                    self.log('math_'+name, math_m[name])
+                    print('math_'+name, math_m[name])
+            
+            if 'german' in metrics.keys():
+                german_m = metrics['german']
+
+                for name in german_m.keys():
+                    self.log('german_'+name, german_m[name])
+                    print('german_'+name, german_m[name])
+
+            
+
+            return
+        
         metrics = self.compute_metrics(self.metric_k)
 
         for name in metrics.keys():
             self.log(name, metrics[name])
             print(name, metrics[name])
-
+        
+        
 
     def on_test_epoch_start(self):
-        self.predict_proba = torch.Tensor()
-        self.eval_results = (torch.Tensor(), torch.Tensor(), torch.Tensor(), torch.Tensor())
+        self.predict_proba = torch.Tensor().detach().cpu()
+        self.eval_results = (torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu(), torch.Tensor().detach().cpu())
 
 
     def on_test_epoch_end(self):
+        if self.joint:
+            eval_results = self.eval_results
+
+            topic_ids = list(map(lambda x: self.topic_ids[int(x)], eval_results[1]))
+            df = pd.DataFrame({'user_id': eval_results[0], 'topic_id': topic_ids, 'was_interaction': eval_results[2].flatten(), 'predict_proba': eval_results[3].flatten()})
+            
+            
+            metrics = metrics_per_topic(df, self.metric_k, math_ids=self.math_ids, german_ids=self.german_ids)
+            
+            
+
+            if 'math' in metrics.keys():
+                math_m = metrics['math']
+                for name in math_m.keys():
+                    self.log('math_'+name, math_m[name])
+                    print('math_'+name, math_m[name])
+            
+            if 'german' in metrics.keys():
+                german_m = metrics['german']
+
+                for name in german_m.keys():
+                    self.log('german_'+name, german_m[name])
+                    print('german_'+name, german_m[name])
+
+            
+
+            return
+        
         metrics = self.compute_metrics(self.metric_k)
 
         for name in metrics.keys():
@@ -183,9 +261,9 @@ class NCFNetwork(pl.LightningModule):
 
 
         students, topics, labels, probas = self.eval_results
-        students = torch.cat([students, student_x])
-        topics = torch.cat([topics, topic_x])
-        labels = torch.cat([labels, y])
+        students = torch.cat([students, student_x.detach().cpu()])
+        topics = torch.cat([topics, topic_x.detach().cpu()])
+        labels = torch.cat([labels, y.detach().cpu()])
         probas = torch.cat([probas, y_proba.detach().cpu()])
         self.eval_results = (students, topics, labels, probas)
 

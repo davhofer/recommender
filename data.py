@@ -177,6 +177,8 @@ def create_user_features(users, transactions):
 
     user_features = user_features.set_index('user_id')
 
+    user_features = (user_features - user_features.mean())/user_features.std()
+
     return user_features
 
 
@@ -193,16 +195,19 @@ def create_topic_features(topics, documents, events):
     topic_features = df_add_data(topic_features, 'num_events', num_events, key='topic_id')
 
     topic_features = topic_features.set_index('topic_id')
+
+    topic_features = (topic_features - topic_features.mean())/topic_features.std()
+
     return topic_features
 
 
 
 class LeaveOneOutDS(Dataset):
-    def __init__(self, data, user_ids, topic_ids, device):
+    def __init__(self, data, user_ids, topic_ids):
         self.data = data
         self.user_ids = user_ids
         self.topic_ids = topic_ids
-        self.device = device
+
 
     def __len__(self):
         return len(self.data)

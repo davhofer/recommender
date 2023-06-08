@@ -77,7 +77,7 @@ def preprocess_events(df, topics, math=True, german=True):
 def df_add_data(df, col_name, data, fill_na_value=0, key='user_id'):
     dtype = type(data.keys()[0])
     def get_val(row):
-        if dtype(row[key]) in data.keys():
+        if dtype(row[key]) in data.keys(): 
             if np.isnan(data[dtype(row[key])]):
                 return fill_na_value
             else:
@@ -605,3 +605,38 @@ class SequentialDS(Dataset):
         label_topic = torch.tensor(label_topic)
 
         return torch.tensor(topic_sequence), torch.tensor(sequence_len), label_topic
+
+
+class PopularitySplitter:
+    def __init__(self,
+                 preprocessed_df,
+                 test_user_frac=0.5,
+                 val_user_frac=0.5):
+        
+        self.df = preprocessed_df
+        user_ids = list(self.df['user_id'].unique())
+        
+        interactions = list(self.df.groupby(['user_id', 'topic_id', 'event_date']).count().index)
+        test_size = int(test_user_frac * len(user_ids))
+        val_size = int(val_user_frac * len(user_ids))
+
+        val_test_interactions = []
+        user_last_event = self.df[['user_id', 'event_date']].groupby('user_id').max()
+        self.df['test_val_set'] = self.df.apply(lambda row: row['event_date'] == user_last_event['event_date'][row['user_id']], axis=1)
+        val_test_interactions = list(self.df[self.df['test_val_set']].groupby(['user_id', 'topic_id', 'event_date']).count().index)
+
+        self.test_samples = random.sample(val_test_interactions, test_size)
+        
+        # get validation interactions. make sure there is no overlap
+        self.val_samples = random.sample(list(set(val_test_interactions) - set(self.test_samples)), val_size)
+
+        self.train_dataset = sorted(list(set(interactions) - set(val_test_interactions)), key=lambda x: x[2])
+
+    def get_train_dataset(self):
+        return self.train_dataset
+    
+    def get_val_dataset(self):
+        return self.val_samples
+    
+    def get_test_dataset(self):
+        return self.test_samples

@@ -12,7 +12,10 @@ def HitRate_NDCG_MRR(df, n):
 
     for user, topic in user_predict:
         # Get the top N of highest probability and rank them 
+        if (topic['was_interaction']==1).any() == False:
+            continue
         topN = [x for _, x in sorted(zip(topic['predict_proba'], topic['topic_id']), reverse=True)][:n]
+        
         positive_topic = int(topic[topic['was_interaction']==1]['topic_id'])
         # Calculate hit rate
         hit_list.append(getHitRatio(topN, positive_topic))
@@ -22,7 +25,7 @@ def HitRate_NDCG_MRR(df, n):
 
         # Calculate MRR
         mrr_list.append(getMRR(topN, positive_topic))
-        
+    
     return {f'HitRate@{n}': np.array(hit_list).mean(), f'NDCG@{n}': np.array(ndcg_list).mean(), f'MRR@{n}': np.array(mrr_list).mean()}
 
 

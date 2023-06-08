@@ -35,7 +35,7 @@ def metrics_per_topic(df, n, math=True, german=True, math_ids=[], german_ids=[])
     if german:
         german_df = df[df['topic_id'].isin(german_ids)]
         metrics['german'] = HitRate_NDCG_MRR(german_df, n)
-
+        
     return metrics
 
 def HitRate_NDCG_MRR_from_CSV(proba_all_topic_csv, n=10, math=True, german=True, math_ids=[], german_ids=[]):
@@ -57,26 +57,14 @@ def getMRR(ranklist, topic):
     if topic not in ranklist:
         return 0
     return 1.0/(ranklist.index(topic) + 1)
-    # for i in range(len(ranklist)):
-    #     if ranklist[i] == topic:
-    #         return 1/i
-    # return 0
 
 def getHitRatio(ranklist, topic):
     return int(topic in ranklist)
-    # for item in ranklist:
-    #     if item == topic:
-    #         return 1
-    # return 0
 
 def getNDCG(ranklist, topic):
     if topic not in ranklist:
         return 0
     return math.log(2) / math.log(ranklist.index(topic)+2)
-    # for i in range(len(ranklist)):
-    #     if ranklist[i] == topic:
-    #         return math.log(2) / math.log(i+2)
-    # return 0
 
 
 if __name__ == '__main__':

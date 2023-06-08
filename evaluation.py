@@ -30,15 +30,24 @@ def HitRate_NDCG_MRR(df, n):
 
 
 
-def metrics_per_topic(df, n, math=True, german=True, math_ids=[], german_ids=[]):
+def metrics_per_topic(df, n, math_ids=[], german_ids=[]):
+    
+
     metrics = dict()
-    if math:
-        math_df = df[df['topic_id'].isin(math_ids)]
+    math_df = df[df['topic_id'].isin(math_ids)].copy()
+
+
+    if len(math_df) > 0:
         metrics['math'] = HitRate_NDCG_MRR(math_df, n)
-    if german:
-        german_df = df[df['topic_id'].isin(german_ids)]
-        metrics['german'] = HitRate_NDCG_MRR(german_df, n)
         
+    
+    german_df = df[df['topic_id'].isin(german_ids)].copy()
+    
+
+    if len(german_df) > 0:
+        
+        metrics['german'] = HitRate_NDCG_MRR(german_df, n)
+    
     return metrics
 
 def HitRate_NDCG_MRR_from_CSV(proba_all_topic_csv, n=10, math=True, german=True, math_ids=[], german_ids=[]):

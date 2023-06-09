@@ -53,8 +53,8 @@ class LeaveOneOutGraphDS(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        user_id, topic_id = self.data[index]
-        return self.get_user_data(user_id), self.get_topic_data(topic_id)
+        user_id, topic_id, label = self.data[index]
+        return self.get_user_data(user_id), self.get_topic_data(topic_id), torch.Tensor([label])
 
 
 class PositiveNegativeGraphDS(Dataset):
@@ -132,12 +132,12 @@ def remap_train_data(user_index, topic_index, train_data, val_data, test_data):
         remapped_train_data.append((user_index[user], topic_index[positive_topic], topic_index[negative_topic]))
 
     remapped_val_data = []
-    for user, topic in val_data:
-        remapped_val_data.append((user_index[user], topic_index[topic]))
+    for user, topic, label in val_data:
+        remapped_val_data.append((user_index[user], topic_index[topic], label))
 
     remapped_test_data = []
-    for user, topic in test_data:
-        remapped_test_data.append((user_index[user], topic_index[topic]))
+    for user, topic, label in test_data:
+        remapped_test_data.append((user_index[user], topic_index[topic], label))
 
     return remapped_train_data, remapped_val_data, remapped_test_data
 

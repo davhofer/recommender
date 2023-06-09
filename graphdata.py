@@ -55,6 +55,9 @@ class LeaveOneOutGraphDS(GraphDS):
     def __init__(self, data: List[Tuple[int, int, int]], knowledge_graph: EntitiesGraph):
         super().__init__(data, knowledge_graph)
 
+    def __len__(self):
+        return len(self.data)
+
     def __getitem__(self, index):
         user_id, topic_id, label = self.data[index]
         return self.get_user_data(user_id), self.get_topic_data(topic_id), torch.Tensor([label])
@@ -63,6 +66,9 @@ class LeaveOneOutGraphDS(GraphDS):
 class PositiveNegativeGraphDS(GraphDS):
     def __init__(self, data: List[Tuple[int, int, int]], knowledge_graph: EntitiesGraph):
         super().__init__(data, knowledge_graph)
+
+    def __len__(self):
+        return len(self.data)
 
     def __getitem__(self, index):
         user_id, positive_topic_id, negative_topic_id = self.data[index]

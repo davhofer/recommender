@@ -229,6 +229,7 @@ def train_test_val_split(df,
                          train_negative_frac,
                          match_users_in_train_negative_samples=False,
                          return_positive_negative_pairs_in_train=False,
+                         return_train_positive_examples=False,
                          test_sample_strat="newest",
                          verbose=1,
                          ):
@@ -236,6 +237,10 @@ def train_test_val_split(df,
         raise ValueError("'test_user_frac' + 'val_user_frac' must be <= 1.0")
     if test_sample_strat not in ['newest', 'random']:
         raise ValueError("'test_sample_strat' should either be 'newest' or 'random'!")
+    if return_train_positive_examples and not return_positive_negative_pairs_in_train:
+        raise ValueError(
+            "'return_positive_examples_additionally' should only be set with 'return_positive_negative_pairs_in_train'"
+        )
 
     user_ids = list(df['user_id'].unique())
     topic_ids = list(df['topic_id'].unique())
@@ -326,6 +331,11 @@ def train_test_val_split(df,
             for positive_topic in positive_examples_by_user[user]:
                 for negative_topic in negative_examples_by_user[user]:
                     train_data.append((user, positive_topic, negative_topic))
+
+        if return_train_positive_examples:
+            return train_data, val_data, test_data, positive_examples_by_user
+
+        return train_data, val_data, test_data,
     else:
         for x in positives:
             train_data.append((x[0], x[1], 1.0))

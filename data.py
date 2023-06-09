@@ -540,9 +540,26 @@ class SequentialSplitter:
         self.topic_ids = list(self.df['topic_id'].unique())
         self.num_topics = len(self.topic_ids)
 
+        def unique_list(l):
+            unique_l = []
+            for v in l:
+                if len(unique_l) == 0 or unique_l[-1] != v:
+                    unique_l.append(v)
+            return unique_l
+
+        def list_join(lists):
+            result = []
+            for l in lists:
+                for v in l:
+                    result.append(v)
+            return result
+
         # grouping sorted by timestep topic interactions by user
-        self.df = self.df.sort_values(by='event_date')[['user_id', 'topic_id']].groupby('user_id').agg(
-            list).reset_index()
+        self.df['datetime_mask'] = (self.df['event_date'].dt.strftime('%y-%m-%d-%H') + '-' +
+                                    np.where(self.df['event_date'].dt.minute < 30, '0', '30'))
+        self.df = self.df.sort_values(by='event_date')[['user_id', 'topic_id', 'datetime_mask']].groupby(['user_id', 'datetime_mask']).agg(unique_list).reset_index()
+
+        self.df = self.df.sort_values(by='datetime_mask')[['user_id', 'topic_id']].groupby(['user_id']).agg(list_join).reset_index()
         self.df = self.df.rename(columns={'topic_id': 'initial_topic_seq'})
 
         # dropping sequences of length 3 or less because these would have empty training data

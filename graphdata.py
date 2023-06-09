@@ -41,8 +41,20 @@ class LeaveOneOutGraphDS(Dataset):
         self.data = data
         self.knowledge_graph = knowledge_graph
 
+    def get_user_data(self, user_id):
+        return torch.tensor(user_id), self.knowledge_graph.user_to_topics_and_relations[user_id]
+
+    def get_topic_data(self, topic_id):
+        topic_neighbours_and_relations = self.knowledge_graph.topic_to_topics_and_relations[topic_id]
+        user_neighbours_and_relations = self.knowledge_graph.topic_to_users_and_relations[topic_id]
+        return torch.tensor(topic_id), topic_neighbours_and_relations, user_neighbours_and_relations
+
     def __len__(self):
         return len(self.data)
+
+    def __getitem__(self, index):
+        user_id, topic_id = self.data[index]
+        return self.get_user_data(user_id), self.get_topic_data(topic_id)
 
 
 class PositiveNegativeGraphDS(Dataset):

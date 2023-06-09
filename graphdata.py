@@ -29,19 +29,6 @@ def filter_topic_trees(events_preprocessed, topic_trees, include_leafs_and_roots
 
 
 @dataclass
-class UserData:
-    user: torch.Tensor
-    topic_neighbours_and_relations: torch.Tensor  # num_neighbours x 2
-
-
-@dataclass
-class TopicData:
-    topic: torch.Tensor
-    topic_neighbours_and_relations: torch.Tensor  # num_neighbours x 2
-    user_neighbours_and_relations: torch.Tensor  # num_neighbours x 2
-
-
-@dataclass
 class EntitiesGraph:
     user_topic_relations: List[Tuple[int, int]]
     user_to_topics_and_relations: Dict[int, torch.Tensor]  # num_neighbours x 2
@@ -63,30 +50,20 @@ class PositiveNegativeGraphDS(Dataset):
         self.data = data
         self.knowledge_graph = knowledge_graph
 
+    def get_user_data(self, user_id):
+        return torch.tensor(user_id), self.knowledge_graph.user_to_topics_and_relations[user_id]
+
+    def get_topic_data(self, topic_id):
+        topic_neighbours_and_relations = self.knowledge_graph.topic_to_topics_and_relations[topic_id]
+        user_neighbours_and_relations = self.knowledge_graph.topic_to_users_and_relations[topic_id]
+        return torch.tensor(topic_id), topic_neighbours_and_relations, user_neighbours_and_relations
+
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         user_id, positive_topic_id, negative_topic_id = self.data[index]
-
-        user_data = UserData(
-            user=torch.tensor(user_id),
-            topic_neighbours_and_relations=self.knowledge_graph.user_to_topics_and_relations[user_id]
-        )
-
-        positive_topic_data = TopicData(
-            topic=torch.tensor(positive_topic_id),
-            topic_neighbours_and_relations=self.knowledge_graph.topic_to_topics_and_relations[positive_topic_id],
-            user_neighbours_and_relations=self.knowledge_graph.topic_to_users_and_relations[positive_topic_id]
-        )
-
-        negative_topic_data = TopicData(
-            topic=torch.tensor(negative_topic_id),
-            topic_neighbours_and_relations=self.knowledge_graph.topic_to_topics_and_relations[negative_topic_id],
-            user_neighbours_and_relations=self.knowledge_graph.topic_to_users_and_relations[negative_topic_id]
-        )
-
-        return user_data, positive_topic_data, negative_topic_data
+        return self.get_user_data(user_id), self.get_topic_data(positive_topic_id), self.get_topic_data(negative_topic_id)
 
 
 def construct_knowledge_graph(

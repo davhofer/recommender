@@ -177,10 +177,7 @@ def create_user_features(users, transactions):
 
     user_features = user_features.set_index('user_id')
 
-    user_features = (user_features - user_features.mean())/user_features.std()
-
     return user_features
-
 
 def create_topic_features(topics, documents, events):
 
@@ -364,7 +361,8 @@ class LeaveOneOutSplitter:
         self.test_sample_strat = test_sample_strat
 
         self.use_features = use_features
-        self.user_features = user_features
+        self.user_features = (user_features - user_features.mean())/user_features.std()
+        
         self.topic_features = topic_features
 
         self.user_ids = list(self.df['user_id'].unique())
@@ -373,6 +371,9 @@ class LeaveOneOutSplitter:
         self.num_students = len(self.user_ids)
         self.num_topics = len(self.topic_ids)
 
+        self.user_features_gender_swap = user_features.copy()
+        self.user_features_gender_swap['gender'] = (3 - user_features['gender'])%3
+        self.user_features_gender_swap =  (self.user_features_gender_swap - self.user_features_gender_swap.mean())/self.user_features_gender_swap.std()
 
         if test_user_frac + val_user_frac > 1:
             print("'test_user_frac' + 'val_user_frac' must be <= 1.0")
@@ -393,12 +394,12 @@ class LeaveOneOutSplitter:
 
 
         self.data, self.val_data, self.test_data = train_test_val_split(preprocessed_df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat, verbose=verbose)
-
+        self.test_data_gender_swap = None 
         if verbose:
             print("Adding features...")
-
+        
         self.change_features(self.use_features, self.user_features, self.topic_features)
-
+        
 
     def change_features(self, use_features, user_features, topic_features):
         self.use_features = use_features
@@ -413,7 +414,7 @@ class LeaveOneOutSplitter:
 
         self.test_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[-1]), self.test_data))
 
-        
+        self.test_data_gender_swap = list(map(lambda x: (x[0], x[1], self._get_user_feature_gender_swap(x[0]), self._get_topic_feature(x[1]), x[-1]), self.test_data))       
 
     def get_data(self):
         return self.data
@@ -423,7 +424,9 @@ class LeaveOneOutSplitter:
 
     def get_test_data(self):
         return self.test_data
-    
+
+    def get_test_data_gender_swap(self):
+        return self.test_data_gender_swap
 
     def _get_user_feature(self, uid):
         if not self.use_features:
@@ -433,6 +436,16 @@ class LeaveOneOutSplitter:
             return torch.zeros(self.num_user_features).float()
 
         return torch.tensor(self.user_features.loc[uid, :]).float()
+
+    def _get_user_feature_gender_swap(self, uid):
+
+        if not self.use_features:
+            return torch.Tensor()
+
+        if uid not in self.user_features_gender_swap.index:
+            return torch.zeros(self.num_user_features).float()
+
+        return torch.tensor(self.user_features_gender_swap.loc[uid, :]).float()
 
     def _get_topic_feature(self, tid):
         if not self.use_features:

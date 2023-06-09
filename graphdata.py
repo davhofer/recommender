@@ -37,7 +37,7 @@ class EntitiesGraph:
 
 
 class LeaveOneOutGraphDS(Dataset):
-    def __init__(self, data: List[Tuple[int, int]], knowledge_graph: EntitiesGraph):
+    def __init__(self, data: List[Tuple[int, int, int]], knowledge_graph: EntitiesGraph):
         self.data = data
         self.knowledge_graph = knowledge_graph
 

@@ -88,7 +88,7 @@ def construct_knowledge_graph(
     user_to_topics_and_relations: Dict[int, List[Tuple[int, int]]] = defaultdict(list)
     topic_to_users_and_relations: Dict[int, List[Tuple[int, int]]] = defaultdict(list)
 
-    for user, topics in positive_examples_by_user:
+    for user, topics in positive_examples_by_user.items():
         user_idx = user_index[user]
         for topic in topics:
             topic_idx = topic_index[topic]

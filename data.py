@@ -177,6 +177,8 @@ def create_user_features(users, transactions):
 
     user_features = user_features.set_index('user_id')
 
+    user_features = (user_features - user_features.mean())/user_features.std()
+
     return user_features
 
 
@@ -193,6 +195,9 @@ def create_topic_features(topics, documents, events):
     topic_features = df_add_data(topic_features, 'num_events', num_events, key='topic_id')
 
     topic_features = topic_features.set_index('topic_id')
+
+    topic_features = (topic_features - topic_features.mean())/topic_features.std()
+
     return topic_features
 
 
@@ -202,6 +207,7 @@ class LeaveOneOutDS(Dataset):
         self.data = data
         self.user_ids = user_ids
         self.topic_ids = topic_ids
+
 
     def __len__(self):
         return len(self.data)
@@ -331,7 +337,8 @@ class LeaveOneOutSplitter:
                  val_user_frac=0.5,
                  train_negative_frac=1.0,
                  test_sample_strat="newest",
-                 verbose=1
+                 verbose=1,
+                 device=None
                  ):
         if test_sample_strat not in ['newest', 'random']:
             print("'test_sample_strat' should either be 'newest' or 'random'!")
@@ -347,6 +354,11 @@ class LeaveOneOutSplitter:
         val set: pos = disjoint subset of all interactions, neg = all non-interactions for those interactions users
         """
 
+        if device:
+            self.device = device 
+        else:
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        
         self.df = preprocessed_df 
         self.train_negative_frac = train_negative_frac
         self.test_sample_strat = test_sample_strat
@@ -444,13 +456,13 @@ class LeaveOneOutSplitter:
         return self.topic_ids
 
     def get_train_dataset(self):
-        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
+        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
 
     def get_val_dataset(self):
-        return LeaveOneOutDS(self.get_val_data(), self.get_user_ids(), self.get_topic_ids())
+        return LeaveOneOutDS(self.get_val_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
 
     def get_test_dataset(self):
-        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())
+        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
     
 
 class ItemKNNSplitter:

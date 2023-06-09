@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 import random
 import pandas as pd
 import numpy as np
-
+from collections import defaultdict
 
 PAD_TOPIC_ID = 0
 
@@ -224,14 +224,24 @@ class LeaveOneOutDS(Dataset):
 
 # TODO: test how many negative examples in test/val set occur in training set
 
-def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac, test_sample_strat="newest", verbose=1):
+def train_test_val_split(df,
+                         test_user_frac,
+                         val_user_frac,
+                         train_negative_frac,
+                         match_users_in_train_negative_samples=False,
+                         return_positive_negative_pairs_in_train=False,
+                         return_train_positive_examples=False,
+                         test_sample_strat="newest",
+                         verbose=1,
+                         ):
     if test_user_frac + val_user_frac > 1:
-            print("'test_user_frac' + 'val_user_frac' must be <= 1.0")
-            return
+        raise ValueError("'test_user_frac' + 'val_user_frac' must be <= 1.0")
     if test_sample_strat not in ['newest', 'random']:
-            print("'test_sample_strat' should either be 'newest' or 'random'!")
-            return
-    
+        raise ValueError("'test_sample_strat' should either be 'newest' or 'random'!")
+    if return_train_positive_examples and not return_positive_negative_pairs_in_train:
+        raise ValueError(
+            "'return_positive_examples_additionally' should only be set with 'return_positive_negative_pairs_in_train'"
+        )
 
     user_ids = list(df['user_id'].unique())
     topic_ids = list(df['topic_id'].unique())
@@ -301,15 +311,38 @@ def train_test_val_split(df, test_user_frac, val_user_frac, train_negative_frac,
     # TODO: do we include the negative samples from the training set in the test/val set?
     #####################################################################################
 
+    if match_users_in_train_negative_samples:
+        positive_interactions_users = {user for user, topic in positives}
+        non_interactions = [(user, topic) for user, topic in non_interactions if user in positive_interactions_users]
+
     negatives = random.sample(list(non_interactions), int(train_negative_frac*len(positives)))
 
     train_data = []
+    if return_positive_negative_pairs_in_train:
+        positive_examples_by_user = defaultdict(list)
+        negative_examples_by_user = defaultdict(list)
+        for user, topic in positives:
+            positive_examples_by_user[user].append(topic)
+        for user, topic in negatives:
+            negative_examples_by_user[user].append(topic)
 
-    for x in positives:
-        train_data.append((x[0], x[1], 1.0))
+        assert positive_examples_by_user.keys() == negative_examples_by_user.keys()
 
-    for x in negatives:
-        train_data.append((x[0], x[1], 0.0))
+        for user in positive_examples_by_user:
+            for positive_topic in positive_examples_by_user[user]:
+                for negative_topic in negative_examples_by_user[user]:
+                    train_data.append((user, positive_topic, negative_topic))
+
+        if return_train_positive_examples:
+            return train_data, val_data, test_data, positive_examples_by_user
+
+        return train_data, val_data, test_data,
+    else:
+        for x in positives:
+            train_data.append((x[0], x[1], 1.0))
+
+        for x in negatives:
+            train_data.append((x[0], x[1], 0.0))
 
     print("Completed train dataset")
 

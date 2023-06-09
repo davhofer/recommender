@@ -116,7 +116,7 @@ class TransformerRecommender:
             dropout (float): Dropout rate.
         """
         
-        new_data = data[['user_id', 'topic_id']].copy()
+        new_data = data.sort_values(['user_id', 'event_date'])[['user_id', 'topic_id']].copy()
 
         # encode the topic IDs
         self.topic_encoder = { 0 : 0 }

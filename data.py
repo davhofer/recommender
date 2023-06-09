@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 import random
 import pandas as pd
 import numpy as np
-
+from collections import defaultdict
 
 PAD_TOPIC_ID = 0
 
@@ -228,6 +228,7 @@ def train_test_val_split(df,
                          val_user_frac,
                          train_negative_frac,
                          match_users_in_train_negative_samples=False,
+                         return_positive_negative_pairs_in_train=False,
                          test_sample_strat="newest",
                          verbose=1,
                          ):
@@ -311,12 +312,26 @@ def train_test_val_split(df,
     negatives = random.sample(list(non_interactions), int(train_negative_frac*len(positives)))
 
     train_data = []
+    if return_positive_negative_pairs_in_train:
+        positive_examples_by_user = defaultdict(list)
+        negative_examples_by_user = defaultdict(list)
+        for user, topic in positives:
+            positive_examples_by_user[user].append(topic)
+        for user, topic in negatives:
+            negative_examples_by_user[user].append(topic)
 
-    for x in positives:
-        train_data.append((x[0], x[1], 1.0))
+        assert positive_examples_by_user.keys() == negative_examples_by_user.keys()
 
-    for x in negatives:
-        train_data.append((x[0], x[1], 0.0))
+        for user in positive_examples_by_user:
+            for positive_topic in positive_examples_by_user[user]:
+                for negative_topic in negative_examples_by_user[user]:
+                    train_data.append((user, positive_topic, negative_topic))
+    else:
+        for x in positives:
+            train_data.append((x[0], x[1], 1.0))
+
+        for x in negatives:
+            train_data.append((x[0], x[1], 0.0))
 
     print("Completed train dataset")
 

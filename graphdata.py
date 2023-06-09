@@ -36,6 +36,7 @@ class EntitiesGraph:
     topic_to_topics_and_relations: Dict[int, torch.Tensor]  # num_neighbours x 2
     num_topic_to_topic_relations: int
 
+
 class GraphDS(Dataset):
     def __init__(self, data: List[Tuple[int, int, int]], knowledge_graph: EntitiesGraph):
         self.data = data
@@ -46,9 +47,9 @@ class GraphDS(Dataset):
         return torch.tensor(user_id), neighbour_users_and_relations
 
     def get_topic_data(self, topic_id):
-        neighbour_topics_and_relations = self.knowledge_graph.topic_to_topics_and_relations.get(topic_id, torch.empty((0, 2)))
         neighbour_users_and_relations = self.knowledge_graph.topic_to_users_and_relations.get(topic_id, torch.empty((0, 2)))
-        return torch.tensor(topic_id), neighbour_topics_and_relations, neighbour_users_and_relations
+        neighbour_topics_and_relations = self.knowledge_graph.topic_to_topics_and_relations.get(topic_id, torch.empty((0, 2)))
+        return torch.tensor(topic_id), neighbour_users_and_relations, neighbour_topics_and_relations
 
 
 class LeaveOneOutGraphDS(GraphDS):

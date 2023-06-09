@@ -197,7 +197,7 @@ class LeaveOneOutGraphSplitter:
             test_sample_strat=self.test_sample_strat,
             match_users_in_train_negative_samples=True,
             return_positive_negative_pairs_in_train=True,
-            return_train_positive_examples_additionally=True,
+            return_train_positive_examples=True,
         )
 
         self.user_index, self.topic_index = get_user_topic_index(users=self.user_ids, topics=self.topic_ids)

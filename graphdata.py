@@ -36,43 +36,33 @@ class EntitiesGraph:
     topic_to_topics_and_relations: Dict[int, torch.Tensor]  # num_neighbours x 2
     num_topic_to_topic_relations: int
 
-
-class LeaveOneOutGraphDS(Dataset):
+class GraphDS(Dataset):
     def __init__(self, data: List[Tuple[int, int, int]], knowledge_graph: EntitiesGraph):
         self.data = data
         self.knowledge_graph = knowledge_graph
 
     def get_user_data(self, user_id):
-        return torch.tensor(user_id), self.knowledge_graph.user_to_topics_and_relations[user_id]
+        neighbour_users_and_relations = self.knowledge_graph.user_to_topics_and_relations.get(user_id, torch.empty((0, 2)))
+        return torch.tensor(user_id), neighbour_users_and_relations
 
     def get_topic_data(self, topic_id):
-        topic_neighbours_and_relations = self.knowledge_graph.topic_to_topics_and_relations[topic_id]
-        user_neighbours_and_relations = self.knowledge_graph.topic_to_users_and_relations[topic_id]
-        return torch.tensor(topic_id), topic_neighbours_and_relations, user_neighbours_and_relations
+        neighbour_topics_and_relations = self.knowledge_graph.topic_to_topics_and_relations.get(topic_id, torch.empty((0, 2)))
+        neighbour_users_and_relations = self.knowledge_graph.topic_to_users_and_relations.get(topic_id, torch.empty((0, 2)))
+        return torch.tensor(topic_id), neighbour_topics_and_relations, neighbour_users_and_relations
 
-    def __len__(self):
-        return len(self.data)
+
+class LeaveOneOutGraphDS(GraphDS):
+    def __init__(self, data: List[Tuple[int, int, int]], knowledge_graph: EntitiesGraph):
+        super().__init__(data, knowledge_graph)
 
     def __getitem__(self, index):
         user_id, topic_id, label = self.data[index]
         return self.get_user_data(user_id), self.get_topic_data(topic_id), torch.Tensor([label])
 
 
-class PositiveNegativeGraphDS(Dataset):
+class PositiveNegativeGraphDS(GraphDS):
     def __init__(self, data: List[Tuple[int, int, int]], knowledge_graph: EntitiesGraph):
-        self.data = data
-        self.knowledge_graph = knowledge_graph
-
-    def get_user_data(self, user_id):
-        return torch.tensor(user_id), self.knowledge_graph.user_to_topics_and_relations[user_id]
-
-    def get_topic_data(self, topic_id):
-        topic_neighbours_and_relations = self.knowledge_graph.topic_to_topics_and_relations[topic_id]
-        user_neighbours_and_relations = self.knowledge_graph.topic_to_users_and_relations[topic_id]
-        return torch.tensor(topic_id), topic_neighbours_and_relations, user_neighbours_and_relations
-
-    def __len__(self):
-        return len(self.data)
+        super().__init__(data, knowledge_graph)
 
     def __getitem__(self, index):
         user_id, positive_topic_id, negative_topic_id = self.data[index]

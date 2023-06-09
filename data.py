@@ -207,6 +207,7 @@ class LeaveOneOutDS(Dataset):
         self.data = data
         self.user_ids = user_ids
         self.topic_ids = topic_ids
+        self.gender_val = gender_val
 
 
     def __len__(self):
@@ -456,13 +457,13 @@ class LeaveOneOutSplitter:
         return self.topic_ids
 
     def get_train_dataset(self):
-        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
+        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
 
     def get_val_dataset(self):
-        return LeaveOneOutDS(self.get_val_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
+        return LeaveOneOutDS(self.get_val_data(), self.get_user_ids(), self.get_topic_ids())
 
     def get_test_dataset(self):
-        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
+        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())
     
 
 class ItemKNNSplitter:

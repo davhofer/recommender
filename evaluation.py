@@ -62,7 +62,7 @@ def HitRate_NDCG_MRR_from_CSV(proba_all_topic_csv, n=10, math=True, german=True,
     """
 
     proba_all_topic_df = pd.read_csv(proba_all_topic_csv)
-    metrics = metrics_per_topic(proba_all_topic_df, n, math=math, german=german, math_ids=math_ids, german_ids=german_ids)
+    metrics = metrics_per_topic(proba_all_topic_df, n, math_ids=math_ids, german_ids=german_ids)
     return metrics
 
 def getMRR(ranklist, topic):

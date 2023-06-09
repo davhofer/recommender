@@ -176,6 +176,7 @@ def create_user_features(users, transactions):
     # pd.get_dummies(user_features['class_level'])
 
     user_features = user_features.set_index('user_id')
+    user_features = (user_features - user_features.mean())/user_features.std()
 
     return user_features
 
@@ -361,9 +362,9 @@ class LeaveOneOutSplitter:
         self.test_sample_strat = test_sample_strat
 
         self.use_features = use_features
-        self.user_features = (user_features - user_features.mean())/user_features.std()
         
         self.topic_features = topic_features
+        self.user_features = user_features
 
         self.user_ids = list(self.df['user_id'].unique())
         self.topic_ids = list(self.df['topic_id'].unique())
@@ -371,9 +372,9 @@ class LeaveOneOutSplitter:
         self.num_students = len(self.user_ids)
         self.num_topics = len(self.topic_ids)
 
-        self.user_features_gender_swap = user_features.copy()
-        self.user_features_gender_swap['gender'] = (3 - user_features['gender'])%3
-        self.user_features_gender_swap =  (self.user_features_gender_swap - self.user_features_gender_swap.mean())/self.user_features_gender_swap.std()
+        # self.user_features_gender_swap = user_features.copy()
+        # self.user_features_gender_swap['gender'] = (3 - user_features['gender'])%3
+        # self.user_features_gender_swap =  (self.user_features_gender_swap - self.user_features_gender_swap.mean())/self.user_features_gender_swap.std()
 
         if test_user_frac + val_user_frac > 1:
             print("'test_user_frac' + 'val_user_frac' must be <= 1.0")
@@ -407,6 +408,14 @@ class LeaveOneOutSplitter:
         self.user_features = user_features 
         self.topic_features = topic_features
 
+        if not use_features:
+            self.num_topic_features = 0
+            self.num_user_features = 0
+        else:
+            self.num_user_features = self.user_features.shape[1]
+
+            self.num_topic_features = self.topic_features.shape[1]
+
 
         self.data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[-1]), self.data))
         
@@ -414,7 +423,7 @@ class LeaveOneOutSplitter:
 
         self.test_data = list(map(lambda x: (x[0], x[1], self._get_user_feature(x[0]), self._get_topic_feature(x[1]), x[-1]), self.test_data))
 
-        self.test_data_gender_swap = list(map(lambda x: (x[0], x[1], self._get_user_feature_gender_swap(x[0]), self._get_topic_feature(x[1]), x[-1]), self.test_data))       
+        #self.test_data_gender_swap = list(map(lambda x: (x[0], x[1], self._get_user_feature_gender_swap(x[0]), self._get_topic_feature(x[1]), x[-1]), self.test_data))       
 
     def get_data(self):
         return self.data
@@ -469,13 +478,13 @@ class LeaveOneOutSplitter:
         return self.topic_ids
 
     def get_train_dataset(self):
-        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
+        return LeaveOneOutDS(self.get_data(), self.get_user_ids(), self.get_topic_ids())
 
     def get_val_dataset(self):
-        return LeaveOneOutDS(self.get_val_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
+        return LeaveOneOutDS(self.get_val_data(), self.get_user_ids(), self.get_topic_ids())
 
     def get_test_dataset(self):
-        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids(), self.device)
+        return LeaveOneOutDS(self.get_test_data(), self.get_user_ids(), self.get_topic_ids())
     
 
 class ItemKNNSplitter:

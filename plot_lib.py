@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import networkx as nx
+
 
 def iteration_error_plot(model_error_dict, name_plot="", batch_size=32):
     """
@@ -181,3 +183,11 @@ def models_eval_plot(model_dict):
     # display the plot
     plt.show()
 
+
+def draw_topic_tree(topic_tree, title, node_color, figsize):
+    G = nx.from_pandas_edgelist(topic_tree, source='child_id', target='parent_id', edge_attr=['topic_id'])
+    plt.figure(figsize=figsize)
+    options = {"edge_color": "tab:gray", "node_color": node_color, "node_size": 100, "alpha": 0.8, "font_size": 7}
+    nx.draw_networkx(G, pos=nx.spring_layout(G), **options)
+    plt.title(title)
+    plt.show()

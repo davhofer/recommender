@@ -34,6 +34,7 @@ class EntitiesGraph:
     user_to_topics_and_relations: Dict[int, torch.Tensor]  # num_neighbours x 2
     topic_to_users_and_relations: Dict[int, torch.Tensor]  # num_neighbours x 2
     topic_to_topics_and_relations: Dict[int, torch.Tensor]  # num_neighbours x 2
+    num_topic_to_topic_relations: int
 
 
 class LeaveOneOutGraphDS(Dataset):
@@ -104,6 +105,8 @@ def construct_knowledge_graph(
         topic_to_topics_and_relations[topic_from_idx].append((topic_to_idx, relation_idx))
         topic_to_topics_and_relations[topic_to_idx].append((topic_from_idx, relation_idx))
 
+    num_topic_to_topic_relations = topic_trees['topic_id'].nunique()
+
     def to_tensor(user_data: Dict[int, List[Tuple[int, int]]]) -> Dict[int, torch.Tensor]:
         return {u: torch.tensor(data) for u, data in user_data.items()}
 
@@ -112,6 +115,7 @@ def construct_knowledge_graph(
         user_to_topics_and_relations=to_tensor(user_to_topics_and_relations),
         topic_to_users_and_relations=to_tensor(topic_to_users_and_relations),
         topic_to_topics_and_relations=to_tensor(topic_to_topics_and_relations),
+        num_topic_to_topic_relations=num_topic_to_topic_relations,
     )
 
 
@@ -205,6 +209,18 @@ class LeaveOneOutGraphSplitter:
             val_data=self.val_data,
             test_data=self.test_data,
         )
+
+    def get_num_users(self):
+        return len(self.user_ids)
+
+    def get_num_topics(self):
+        return len(self.topic_ids)
+
+    def get_num_user_to_topic_relations(self):
+        return len(self.knowledge_graph.user_topic_relations)
+
+    def get_num_topic_to_topic_relations(self):
+        return self.knowledge_graph.num_topic_to_topic_relations
 
     def get_train_dataset(self):
         return PositiveNegativeGraphDS(data=self.data, knowledge_graph=self.knowledge_graph)

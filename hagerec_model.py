@@ -9,10 +9,7 @@ class HAGERecNetwork(pl.LightningModule):
                  num_topics,
                  num_user_to_topic_relations,
                  num_topic_to_topic_relations,
-                 user_embedding_dim=256,
-                 topic_embedding_dim=64,
-                 user_to_topic_relation_embedding_dim=256,
-                 topic_to_topic_relation_embedding_dim=64,
+                 embedding_dim=256,
                  hidden_dim=128,
                  loss=BPRLoss(),
                  ):
@@ -23,23 +20,14 @@ class HAGERecNetwork(pl.LightningModule):
         self.num_user_to_topic_relations = num_user_to_topic_relations
         self.num_topic_to_topic_relations = num_topic_to_topic_relations
 
-        self.user_embedding_dim = user_embedding_dim
-        self.topic_embedding_dim = topic_embedding_dim
-        self.user_to_topic_relation_embedding_dim = user_to_topic_relation_embedding_dim
-        self.topic_to_topic_relation_embedding_dim = topic_to_topic_relation_embedding_dim
+        self.embedding_dim = embedding_dim
 
         self.hidden_dim = hidden_dim
 
-        self.topic_embedding_layer = nn.Embedding(self.num_topics, self.topic_embedding_dim)
-        self.user_embedding_layer = nn.Embedding(self.num_users, self.user_embedding_dim)
-        self.user_to_topic_relations_embedding_layer = nn.Embedding(
-            self.num_user_to_topic_relations,
-            self.user_to_topic_relations_embedding_dim,
-        )
-        self.topic_to_topic_relations_embedding_layer = nn.Embedding(
-            self.num_topic_to_topic_relations,
-            self.topic_to_topic_relation_embedding_dim,
-        )
+        self.topic_embedding_layer = nn.Embedding(self.num_topics, self.embedding_dim)
+        self.user_embedding_layer = nn.Embedding(self.num_users, self.embedding_dim)
+        self.user_to_topic_relations_embedding_layer = nn.Embedding(self.num_user_to_topic_relations, self.embedding_dim)
+        self.topic_to_topic_relations_embedding_layer = nn.Embedding(self.num_topic_to_topic_relations,self.embedding_dim)
 
         self.relu = nn.LeakyReLU()
 
@@ -49,12 +37,12 @@ class HAGERecNetwork(pl.LightningModule):
         self.topic_multiplication_linear_layer = nn.Linear(self.topic_embedding_dim, self.hidden_dim)
 
         self.user_attention_layer = nn.Sequential(
-            nn.Linear(2*self.user_embedding_dim, self.hidden_dim),
+            nn.Linear(2*self.embedding_dim, self.hidden_dim),
             self.relu,
             nn.Linear(self.hidden_dim, 1, bias=False)
         )
         self.topic_attention_layer = nn.Sequential(
-            nn.Linear(2*self.topic_embedding_dim, self.hidden_dim),
+            nn.Linear(2*self.embedding_dim, self.hidden_dim),
             self.relu,
             nn.Linear(self.hidden_dim, 1, bias=False)
         )
